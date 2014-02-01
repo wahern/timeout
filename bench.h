@@ -12,6 +12,7 @@ struct op {
 		OP_CHECK,
 		OP_FILL,
 		OP_NONE,
+		OP_TIME,
 	} type;
 
 	union {
