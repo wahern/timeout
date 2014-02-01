@@ -1,161 +1,171 @@
 #include <stdlib.h>
-#include <stdio.h>
-
 #include <string.h>
-
-#include <locale.h>
-
 #include <time.h>
-
+#include <errno.h>
 #include <unistd.h>
-
 #include <dlfcn.h>
 
-#include <err.h>
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
 
 #include "timeout.h"
 #include "bench.h"
 
-#ifndef countof
-#define countof(a) (sizeof (a) / sizeof *(a))
-#endif
 
-
-struct {
+struct bench {
 	const char *path;
 	void *solib;
 	size_t count;
 	timeout_t maximum;
 	int verbose;
 
+	void *state;
 	struct timeout *timeout;
-	struct vops vops;
+	struct benchops ops;
 	timeout_t curtime;
-} MAIN = {
-	.path = "bench-wheel.so",
-	.count = 32678,
-	.maximum = 60000, // 60 seconds in milliseconds
-};
+}; /* struct bench */
 
 
-static int split(char **argv, int max, char *src) {
-	char **ap = argv, **pe = argv + max;
+static int bench_new(lua_State *L) {
+	const char *path = luaL_checkstring(L, 1);
+	size_t count = luaL_optlong(L, 2, 1000000);
+	timeout_t tmax = luaL_optlong(L, 3, 60 * 1000);
+	int verbose = (lua_isnone(L, 4))? 0 : lua_toboolean(L, 4);
+	struct bench *B;
+	struct benchops *ops;
 
-	while (ap < pe && (*ap = strsep(&src, " \t\n"))) {
-		if (**ap)
-			++ap;
+	B = lua_newuserdata(L, sizeof *B);
+	memset(B, 0, sizeof *B);
+
+	luaL_getmetatable(L, "BENCH*");
+	lua_setmetatable(L, -2);
+
+	B->count = count;
+	B->maximum = tmax;
+	B->verbose = verbose;
+
+	if (!(B->timeout = calloc(count, sizeof *B->timeout)))
+		return luaL_error(L, "%s", strerror(errno));
+
+	if (!(B->solib = dlopen(path, RTLD_NOW|RTLD_LOCAL)))
+		return luaL_error(L, "%s: %s", path, dlerror());
+
+	if (!(ops = dlsym(B->solib, "benchops")))
+		return luaL_error(L, "%s: %s", path, dlerror());
+
+	B->ops = *ops;
+	B->state = B->ops.init(B->timeout, B->count, B->verbose);
+
+	return 1;
+} /* bench_new() */
+
+
+static int bench_add(lua_State *L) {
+	struct bench *B = lua_touserdata(L, 1);
+	unsigned i;
+	timeout_t t;
+
+	i = (lua_isnoneornil(L, 2))? random() % B->count : (unsigned)luaL_checklong(L, 2);
+	t = (lua_isnoneornil(L, 3))? random() % B->maximum : (unsigned)luaL_checklong(L, 3);
+
+	B->ops.add(B->state, &B->timeout[i], t);
+
+	return 0;
+} /* bench_add() */
+
+
+static int bench_del(lua_State *L) {
+	struct bench *B = lua_touserdata(L, 1);
+	unsigned i;
+
+	i = (lua_isnoneornil(L, 2))? random() % B->count : (unsigned)luaL_checklong(L, 2);
+
+	B->ops.del(B->state, &B->timeout[i]);
+
+	return 0;
+} /* bench_del() */
+
+
+static int bench_fill(lua_State *L) {
+	struct bench *B = lua_touserdata(L, 1);
+	size_t i;
+
+	for (i = 0; i < B->count; i++) {
+		B->ops.add(B->state, &B->timeout[i], random() % B->maximum);
 	}
 
-	return ap - argv;
-} /* split() */
+	return 0;
+} /* bench_fill() */
 
 
-struct op *parseop(struct op *op, char *ln) {
-	char *arg[8];
-	int argc;
+static int bench_expire(lua_State *L) {
+	struct bench *B = lua_touserdata(L, 1);
+	unsigned count = luaL_optlong(L, 2, B->count);
+	unsigned step = luaL_optlong(L, 3, 300);
+	size_t i = 0;
 
-	if (!(argc = split(arg, countof(arg), ln)))
-		return NULL;
+	while (i < count && !B->ops.empty(B->state)) {
+		B->curtime += step;
+		B->ops.update(B->state, B->curtime);
 
-	switch (**arg) {
-	case 'q': /* quit */
-		op->type = OP_QUIT;
+		while (B->ops.get(B->state))
+			i++;
+	}
 
-		break;
-	case 'h': /* help */
-		op->type = OP_HELP;
-
-		break;
-	case 'a': /* add */
-		if (argc != 3)
-			goto badargc;
-
-		op->type = OP_ADD;
-		op->add.id = strtoul(arg[1], NULL, 0) % MAIN.count;
-		op->add.timeout = strtoul(arg[2], NULL, 0);
-
-		break;
-	case 'd': /* del */
-		if (argc != 2)
-			goto badargc;
-
-		op->type = OP_DEL;
-		op->del.id = strtoul(arg[1], NULL, 0) % MAIN.count;
-
-		break;
-	case 'g': /* get */
-		op->type = OP_GET;
-		op->get.verbose = (argc > 1)? strtol(arg[1], NULL, 0) : 0;
-
-		break;
-	case 's': /* step */
-		if (argc != 2)
-			goto badargc;
-
-		op->type = OP_STEP;
-		op->step.time = strtoul(arg[1], NULL, 0);
-
-		break;
-	case 'u': /* update */
-		if (argc != 2)
-			goto badargc;
-
-		op->type = OP_UPDATE;
-		op->update.time = strtoul(arg[1], NULL, 0);
-
-		break;
-	case 'c': /* check */
-		op->type = OP_CHECK;
-
-		break;
-	case 'f': /* fill */
-		op->type = OP_FILL;
-
-		break;
-	case '#':
-		/* FALL THROUGH */
-	case 'n':
-		op->type = OP_NONE;
-
-		break;
-	case 't':
-		op->type = OP_TIME;
-
-		break;
-	default:
-		op->type = OP_OOPS;
-		snprintf(op->oops.why, sizeof op->oops.why, "%.8s: illegal op", *arg);
-
-		break;
-	} /* switch() */
-
-	return op;
-badargc:
-	op->type = OP_OOPS;
-	snprintf(op->oops.why, sizeof op->oops.why, "wrong number of arguments");
-
-	return op;
-} /* parseop() */
+	return 0;
+} /* bench_expire() */
 
 
-#define SHORT_OPTS "n:t:vh"
-static void usage(FILE *fp) {
-	fprintf(fp,
-		"bench [-%s] LIBRARY\n" \
-		"  -n MAX  maximum number of timeouts\n" \
-		"  -t MAX  maximum timeout\n" \
-		"  -v      increase log level\n" \
-		"  -h      print usage message\n" \
-		"\n" \
-		"[commands]\n" \
-		"  help    print usage message\n" \
-		"  quit    exit program\n" \
-		"\n" \
-		"Report bugs to <william@25thandClement.com>\n",
-	SHORT_OPTS);
-} /* usage() */
+static int bench__gc(lua_State *L) {
+	struct bench *B = lua_touserdata(L, 1);
+
+	if (B->state) {
+		B->ops.destroy(B->state);
+		B->state = NULL;
+	}
+
+	return 0;
+} /* bench_expire() */
 
 
+static const luaL_Reg bench_methods[] = {
+	{ "add",    &bench_add },
+	{ "del",    &bench_del },
+	{ "fill",   &bench_fill },
+	{ "expire", &bench_expire },
+	{ NULL,     NULL }
+};
+
+static const luaL_Reg bench_metatable[] = {
+	{ "__gc", &bench__gc },
+	{ NULL,   NULL }
+};
+
+static const luaL_Reg bench_globals[] = {
+	{ "new", &bench_new },
+	{ NULL,  NULL }
+};
+
+int luaopen_bench(lua_State *L) {
+	if (luaL_newmetatable(L, "BENCH*")) {
+		luaL_register(L, NULL, bench_metatable);
+		lua_newtable(L);
+		luaL_register(L, NULL, bench_methods);
+		lua_setfield(L, -2, "__index");
+	}
+
+	lua_pop(L, 1);
+
+	lua_newtable(L);
+	luaL_register(L, NULL, bench_globals);
+
+	return 1;
+} /* luaopen_bench() */
+
+
+
+#if 0
 int main(int argc, char **argv) {
 	extern char *optarg;
 	extern int optind;
@@ -285,3 +295,5 @@ int main(int argc, char **argv) {
 quit:
 	return 0;
 } /* main() */
+
+#endif

@@ -34,6 +34,9 @@ else
 SOFLAGS = -shared
 endif
 
+bench.so: bench.c
+	$(CC) -o $@ $< $(CPPFLAGS) -DLUA_COMPAT_ALL $(CFLAGS) -Wno-unused-function $(SOFLAGS)
+
 bench-wheel8.so: CPPFLAGS+=-DWHEEL_BIT=3 -DWHEEL_NUM=$(WHEEL_NUM)
 
 bench-wheel8.so: timeout.c

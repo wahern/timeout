@@ -40,6 +40,7 @@ typedef struct min_heap
 {
     struct timeout** p;
     unsigned n, a;
+    timeout_t curtime;
 } min_heap_t;
 
 static inline void           min_heap_ctor(min_heap_t* s);
@@ -155,61 +156,81 @@ void min_heap_shift_down_(min_heap_t* s, unsigned hole_index, struct timeout* e)
 #endif /* _MIN_HEAP_H_ */
 
 
-static timeout_t curtime;
-static min_heap_t timeouts;
-
-static void init(struct timeout *timeout, size_t count, int verbose) {
+static void *init(struct timeout *timeout, size_t count, int verbose) {
+    min_heap_t *H;
     size_t i;
 
-    min_heap_ctor(&timeouts);
-    if (0 != min_heap_reserve(&timeouts, count))
+    H = calloc(1, sizeof *H);
+
+    min_heap_ctor(H);
+    if (0 != min_heap_reserve(H, count))
         err(1, "realloc");
 
     for (i = 0; i < count; i++) {
         min_heap_elem_init(&timeout[i]);
     }
+
+    return H;
 } /* init() */
 
 
-static void add(struct timeout *to, timeout_t expires) {
-    min_heap_erase(&timeouts, to);
-    to->expires = curtime + expires;
-    if (0 != min_heap_push(&timeouts, to))
+static void add(void *ctx, struct timeout *to, timeout_t expires) {
+    min_heap_t *H = ctx;
+    min_heap_erase(H, to);
+    to->expires = H->curtime + expires;
+    if (0 != min_heap_push(H, to))
         err(1, "realloc");
 } /* add() */
 
 
-static void del(struct timeout *to) {
-    min_heap_erase(&timeouts, to);
+static void del(void *ctx, struct timeout *to) {
+    min_heap_erase(ctx, to);
 } /* del() */
 
 
-static struct timeout *get(void) {
+static struct timeout *get(void *ctx) {
+    min_heap_t *H = ctx;
     struct timeout *to;
 
-    if ((to = min_heap_top(&timeouts)) && to->expires <= curtime)
-        return min_heap_pop(&timeouts);
+    if ((to = min_heap_top(H)) && to->expires <= H->curtime)
+        return min_heap_pop(H);
 
     return NULL;
 } /* get() */
 
 
-static void update(timeout_t ts) {
-    curtime = ts;
+static void update(void *ctx, timeout_t ts) {
+    min_heap_t *H = ctx;
+    H->curtime = ts;
 } /* update() */
 
 
-static void check(void) {
+static void check(void *ctx) {
     return;
 } /* check() */
 
 
-const struct vops VOPS = {
-    .init   = &init,
-    .add    = &add,
-    .del    = &del,
-    .get    = &get,
-    .update = &update,
-    .check  = &check,
+static int empty(void *ctx) {
+    min_heap_t *H = ctx;
+
+    return (NULL == min_heap_top(H));
+} /* empty() */
+
+
+static void destroy(void *H) {
+    free(H);
+    return;
+} /* destroy() */
+
+
+const struct benchops benchops = {
+    .init    = &init,
+    .add     = &add,
+    .del     = &del,
+    .get     = &get,
+    .update  = &update,
+    .check   = &check,
+    .empty   = &empty,
+    .destroy = &destroy,
 };
 
