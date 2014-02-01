@@ -5,6 +5,8 @@
 
 #include <locale.h>
 
+#include <time.h>
+
 #include <unistd.h>
 
 #include <dlfcn.h>
@@ -116,6 +118,10 @@ struct op *parseop(struct op *op, char *ln) {
 		op->type = OP_NONE;
 
 		break;
+	case 't':
+		op->type = OP_TIME;
+
+		break;
 	default:
 		op->type = OP_OOPS;
 		snprintf(op->oops.why, sizeof op->oops.why, "%.8s: illegal op", *arg);
@@ -193,6 +199,9 @@ int main(int argc, char **argv) {
 		--argc;
 	}
 
+	if (!MAIN.verbose)
+		setvbuf(stdout, NULL, _IOFBF, 0);
+
 	if (!(MAIN.timeout = calloc(MAIN.count, sizeof *MAIN.timeout)))
 		err(1, "calloc");
 
@@ -255,8 +264,13 @@ int main(int argc, char **argv) {
 			break;
 		case OP_FILL:
 			for (to = MAIN.timeout; to < &MAIN.timeout[MAIN.count]; to++) {
-				MAIN.vops.add(to, random() % MAIN.maximum);
+				MAIN.vops.add(to, arc4random_uniform(MAIN.maximum));
+				//MAIN.vops.add(to, random() % MAIN.maximum);
 			}
+
+			break;
+		case OP_TIME:
+			printf("clock %ld\n", clock());
 
 			break;
 		case OP_NONE:
