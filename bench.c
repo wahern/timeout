@@ -28,7 +28,6 @@ struct bench {
 	struct timeout *timeout;
 	struct benchops ops;
 	timeout_t curtime;
-
 }; /* struct bench */
 
 
@@ -36,21 +35,27 @@ struct bench {
 static mach_timebase_info_data_t timebase;
 #endif
 
-static int bench_clock(lua_State *L) {
+
+static int long long monotime(void) {
 #if __APPLE__
 	unsigned long long abt;
 
 	abt = mach_absolute_time();
 	abt = abt * timebase.numer / timebase.denom;
 
-	lua_pushnumber(L, (double)abt / 1000000000L);
+	return abt / 1000LL;
 #else
 	struct timespec ts;
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 
-	lua_pushnumber(L, (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000L));
+	return (ts.tv_sec * 1000000L) + (ts.tv_nsec / 1000L);
 #endif
+} /* monotime() */
+
+
+static int bench_clock(lua_State *L) {
+	lua_pushnumber(L, (double)monotime() / 1000000L);
 
 	return 1;
 } /* bench_clock() */
@@ -59,7 +64,7 @@ static int bench_clock(lua_State *L) {
 static int bench_new(lua_State *L) {
 	const char *path = luaL_checkstring(L, 1);
 	size_t count = luaL_optlong(L, 2, 1000000);
-	timeout_t tmax = luaL_optlong(L, 3, 60 * 1000);
+	timeout_t tmax = luaL_optlong(L, 3, 300 * 1000000L);
 	int verbose = (lua_isnone(L, 4))? 0 : lua_toboolean(L, 4);
 	struct bench *B;
 	struct benchops *ops;
@@ -106,11 +111,13 @@ static int bench_add(lua_State *L) {
 
 static int bench_del(lua_State *L) {
 	struct bench *B = lua_touserdata(L, 1);
-	unsigned i;
+	size_t i = luaL_optlong(L, 2, random() % B->count);
+	size_t j = luaL_optlong(L, 3, i);
 
-	i = (lua_isnoneornil(L, 2))? random() % B->count : (unsigned)luaL_checklong(L, 2);
-
-	B->ops.del(B->state, &B->timeout[i]);
+	while (i <= j && i < B->count) {
+		B->ops.del(B->state, &B->timeout[i]);
+		++i;
+	}
 
 	return 0;
 } /* bench_del() */
@@ -119,10 +126,17 @@ static int bench_del(lua_State *L) {
 static int bench_fill(lua_State *L) {
 	struct bench *B = lua_touserdata(L, 1);
 	size_t count = luaL_optlong(L, 2, B->count);
+	long timeout = luaL_optlong(L, 3, -1);
 	size_t i;
 
-	for (i = 0; i < count; i++) {
-		B->ops.add(B->state, &B->timeout[i], random() % B->maximum);
+	if (timeout < 0) {
+		for (i = 0; i < count; i++) {
+			B->ops.add(B->state, &B->timeout[i], random() % B->maximum);
+		}
+	} else {
+		for (i = 0; i < count; i++) {
+			B->ops.add(B->state, &B->timeout[i], timeout + i);
+		}
 	}
 
 	return 0;
@@ -132,7 +146,7 @@ static int bench_fill(lua_State *L) {
 static int bench_expire(lua_State *L) {
 	struct bench *B = lua_touserdata(L, 1);
 	unsigned count = luaL_optlong(L, 2, B->count);
-	unsigned step = luaL_optlong(L, 3, 300);
+	unsigned step = luaL_optlong(L, 3, 300000);
 	size_t i = 0;
 
 	while (i < count && !B->ops.empty(B->state)) {
