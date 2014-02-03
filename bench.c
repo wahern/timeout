@@ -29,19 +29,19 @@ struct bench {
 	struct benchops ops;
 	timeout_t curtime;
 
-#if __APPLE__
-	mach_timebase_info_data_t timebase;
-#endif
 }; /* struct bench */
 
 
+#if __APPLE__
+static mach_timebase_info_data_t timebase;
+#endif
+
 static int bench_clock(lua_State *L) {
 #if __APPLE__
-	struct bench *B = lua_touserdata(L, 1);
 	unsigned long long abt;
 
 	abt = mach_absolute_time();
-	abt = abt * B->timebase.numer / B->timebase.denom;
+	abt = abt * timebase.numer / timebase.denom;
 
 	lua_pushnumber(L, (double)abt / 1000000000L);
 #else
@@ -66,10 +66,6 @@ static int bench_new(lua_State *L) {
 
 	B = lua_newuserdata(L, sizeof *B);
 	memset(B, 0, sizeof *B);
-
-#if __APPLE__
-	mach_timebase_info(&B->timebase);
-#endif
 
 	luaL_getmetatable(L, "BENCH*");
 	lua_setmetatable(L, -2);
@@ -160,7 +156,7 @@ static int bench__gc(lua_State *L) {
 	}
 
 	return 0;
-} /* bench_expire() */
+} /* bench__gc() */
 
 
 static const luaL_Reg bench_methods[] = {
@@ -184,6 +180,10 @@ static const luaL_Reg bench_globals[] = {
 };
 
 int luaopen_bench(lua_State *L) {
+#if __APPLE__
+	mach_timebase_info(&timebase);
+#endif
+
 	if (luaL_newmetatable(L, "BENCH*")) {
 		luaL_register(L, NULL, bench_metatable);
 		lua_newtable(L);

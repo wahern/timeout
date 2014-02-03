@@ -316,16 +316,17 @@ struct rbtimeouts {
 
 
 static int timeoutcmp(struct rbtimeout *a, struct rbtimeout *b) {
-	if (a->expires < b->expires)
+	if (a->expires < b->expires) {
 		return -1;
-	else if (a->expires > b->expires)
+	} else if (a->expires > b->expires) {
 		return 1;
-	else if (a < b)
+	} else if (a < b) {
 		return -1;
-	else if (a > b)
+	} else if (a > b) {
 		return 1;
-	else
+	} else {
 		return 0;
+	}
 } /* timeoutcmp() */
 
 LLRB_GENERATE_STATIC(tree, rbtimeout, rbe, timeoutcmp)
@@ -335,6 +336,7 @@ static void *init(struct timeout *timeout, size_t count, int verbose) {
 	size_t i;
 
 	T = malloc(sizeof *T);
+	T->curtime = 0;
 	LLRB_INIT(&T->tree);
 
 	for (i = 0; i < count; i++) {
@@ -351,9 +353,12 @@ static void add(void *ctx, struct timeout *_to, timeout_t expires) {
 	struct rbtimeouts *T = ctx;
 	struct rbtimeout *to = (void *)_to;
 
+	if (to->pending)
+		LLRB_REMOVE(tree, &T->tree, to);
+
 	to->expires = T->curtime + expires;
 	LLRB_INSERT(tree, &T->tree, to);
-	to->pending = 0;
+	to->pending = 1;
 } /* add() */
 
 
@@ -363,6 +368,7 @@ static void del(void *ctx, struct timeout *_to) {
 
 	LLRB_REMOVE(tree, &T->tree, to);
 	to->pending = 0;
+	to->expires = 0;
 } /* del() */
 
 
@@ -373,6 +379,7 @@ static struct timeout *get(void *ctx) {
 	if ((to = LLRB_MIN(tree, &T->tree)) && to->expires <= T->curtime) {
 		LLRB_REMOVE(tree, &T->tree, to);
 		to->pending = 0;
+		to->expires = 0;
 
 		return (void *)to;
 	}
