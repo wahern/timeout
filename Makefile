@@ -34,8 +34,13 @@ else
 SOFLAGS = -shared
 endif
 
+ifeq ($(shell -uname -s), Linux)
+LIBS = -lrt
+endif
+
+
 bench.so: bench.c
-	$(CC) -o $@ $< $(CPPFLAGS) -DLUA_COMPAT_ALL $(CFLAGS) -Wno-unused-function $(SOFLAGS)
+	$(CC) -o $@ $< $(CPPFLAGS) -DLUA_COMPAT_ALL $(CFLAGS) -Wno-unused-function $(SOFLAGS) $(LIBS)
 
 bench-wheel8.so: CPPFLAGS+=-DWHEEL_BIT=3 -DWHEEL_NUM=$(WHEEL_NUM)
 

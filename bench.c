@@ -5,6 +5,10 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
+#if __APPLE__
+#include <mach/mach_time.h>
+#endif
+
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -24,11 +28,29 @@ struct bench {
 	struct timeout *timeout;
 	struct benchops ops;
 	timeout_t curtime;
+
+#if __APPLE__
+	mach_timebase_info_data_t timebase;
+#endif
 }; /* struct bench */
 
 
 static int bench_clock(lua_State *L) {
-	lua_pushnumber(L, (double)clock() / CLOCKS_PER_SEC);
+#if __APPLE__
+	struct bench *B = lua_touserdata(L, 1);
+	unsigned long long abt;
+
+	abt = mach_absolute_time();
+	abt = abt * B->timebase.numer / B->timebase.denom;
+
+	lua_pushnumber(L, (double)abt / 1000000000L);
+#else
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+
+	lua_pushnumber(L, (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000L));
+#endif
 
 	return 1;
 } /* bench_clock() */
@@ -44,6 +66,10 @@ static int bench_new(lua_State *L) {
 
 	B = lua_newuserdata(L, sizeof *B);
 	memset(B, 0, sizeof *B);
+
+#if __APPLE__
+	mach_timebase_info(&B->timebase);
+#endif
 
 	luaL_getmetatable(L, "BENCH*");
 	lua_setmetatable(L, -2);
