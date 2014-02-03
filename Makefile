@@ -34,7 +34,7 @@ else
 SOFLAGS = -shared
 endif
 
-ifeq ($(shell -uname -s), Linux)
+ifeq ($(shell uname -s), Linux)
 LIBS = -lrt
 endif
 
