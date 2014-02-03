@@ -27,6 +27,13 @@ struct bench {
 }; /* struct bench */
 
 
+static int bench_clock(lua_State *L) {
+	lua_pushnumber(L, (double)clock() / CLOCKS_PER_SEC);
+
+	return 1;
+} /* bench_clock() */
+
+
 static int bench_new(lua_State *L) {
 	const char *path = luaL_checkstring(L, 1);
 	size_t count = luaL_optlong(L, 2, 1000000);
@@ -89,9 +96,10 @@ static int bench_del(lua_State *L) {
 
 static int bench_fill(lua_State *L) {
 	struct bench *B = lua_touserdata(L, 1);
+	size_t count = luaL_optlong(L, 2, B->count);
 	size_t i;
 
-	for (i = 0; i < B->count; i++) {
+	for (i = 0; i < count; i++) {
 		B->ops.add(B->state, &B->timeout[i], random() % B->maximum);
 	}
 
@@ -134,6 +142,7 @@ static const luaL_Reg bench_methods[] = {
 	{ "del",    &bench_del },
 	{ "fill",   &bench_fill },
 	{ "expire", &bench_expire },
+	{ "close",  &bench__gc },
 	{ NULL,     NULL }
 };
 
@@ -143,7 +152,8 @@ static const luaL_Reg bench_metatable[] = {
 };
 
 static const luaL_Reg bench_globals[] = {
-	{ "new", &bench_new },
+	{ "new",   &bench_new },
+	{ "clock", &bench_clock },
 	{ NULL,  NULL }
 };
 

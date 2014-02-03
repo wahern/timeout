@@ -1,4 +1,4 @@
-all: bench bench-wheel.so bench-heap.so
+all: bench.so bench-wheel.so bench-heap.so
 
 WHEEL_BIT = 6
 WHEEL_NUM = 4
@@ -68,7 +68,7 @@ bench-%.so: bench-%.c timeout.h
 .PHONY: clean clean~
 
 clean:
-	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM bench *.so *.o
+	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM *.so *.o
 
 clean~: clean
 	$(RM) *~
