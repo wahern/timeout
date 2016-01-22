@@ -43,6 +43,11 @@
 #include "debug.h"
 #endif
 
+#ifdef TIMEOUT_DISABLE_RELATIVE_ACCESS
+#define TO_SET_TIMEOUTS(to, T) ((void)0)
+#else
+#define TO_SET_TIMEOUTS(to, T) ((to)->timeouts = (T))
+#endif
 
 /*
  * A N C I L L A R Y  R O U T I N E S
@@ -254,7 +259,7 @@ static void timeouts_reset(struct timeouts *T) {
 	TAILQ_CONCAT(&reset, &T->expired, tqe);
 
 	TAILQ_FOREACH(to, &reset, tqe) {
-		to->timeouts = NULL;
+		TO_SET_TIMEOUTS(to, NULL);
 		to->pending = NULL;
 	}
 } /* timeouts_reset() */
@@ -289,7 +294,7 @@ TIMEOUT_PUBLIC void timeouts_del(struct timeouts *T, struct timeout *to) {
 		}
 
 		to->pending = NULL;
-		to->timeouts = NULL;
+		TO_SET_TIMEOUTS(to, NULL);
 	}
 } /* timeouts_del() */
 
@@ -317,7 +322,7 @@ static void timeouts_sched(struct timeouts *T, struct timeout *to, timeout_t exp
 
 	to->expires = expires;
 
-	to->timeouts = T;
+	TO_SET_TIMEOUTS(to, T);
 
 	if (expires > T->curtime) {
 		rem = timeout_rem(T, to);
@@ -532,7 +537,7 @@ TIMEOUT_PUBLIC struct timeout *timeouts_get(struct timeouts *T) {
 		if ((to->flags & TIMEOUT_INT) && to->interval > 0) {
 			timeouts_readd(T, to);
 		} else {
-			to->timeouts = 0;
+			TO_SET_TIMEOUTS(to, NULL);
 		}
 
 		return to;
@@ -618,6 +623,7 @@ TIMEOUT_PUBLIC struct timeout *timeout_init(struct timeout *to, int flags) {
 } /* timeout_init() */
 
 
+#ifndef TIMEOUT_DISABLE_RELATIVE_ACCESS
 TIMEOUT_PUBLIC bool timeout_pending(struct timeout *to) {
 	return to->pending && to->pending != &to->timeouts->expired;
 } /* timeout_pending() */
@@ -631,6 +637,7 @@ TIMEOUT_PUBLIC bool timeout_expired(struct timeout *to) {
 TIMEOUT_PUBLIC void timeout_del(struct timeout *to) {
 	timeouts_del(to->timeouts, to);
 } /* timeout_del() */
+#endif
 
 
 /*
