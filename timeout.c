@@ -122,16 +122,24 @@
 #define WHEEL_MASK (WHEEL_LEN - 1)
 #define TIMEOUT_MAX ((TIMEOUT_C(1) << (WHEEL_BIT * WHEEL_NUM)) - 1)
 
-#if WHEEL_BIT == 6
+#include "bitops.c"
 
+#if WHEEL_BIT == 6
+#define ctz(n) ctz64(n)
+#define clz(n) clz64(n)
+#define fls(n) ((int)(64 - clz64(n)))
+#else
+#define ctz(n) ctz32(n)
+#define clz(n) clz32(n)
+#define fls(n) ((int)(32 - clz32(n)))
+#endif
+
+#if WHEEL_BIT == 6
 #define WHEEL_C(n) UINT64_C(n)
 #define WHEEL_PRIu PRIu64
 #define WHEEL_PRIx PRIx64
 
 typedef uint64_t wheel_t;
-
-#define ctz(n) __builtin_ctzll(n)
-#define fls(n) ((int)(sizeof (long long) * CHAR_BIT) - __builtin_clzll(n))
 
 #elif WHEEL_BIT == 5
 
@@ -141,9 +149,6 @@ typedef uint64_t wheel_t;
 
 typedef uint32_t wheel_t;
 
-#define ctz(n) __builtin_ctzl(n)
-#define fls(n) ((int)(sizeof (long) * CHAR_BIT) - __builtin_clzl(n))
-
 #elif WHEEL_BIT == 4
 
 #define WHEEL_C(n) UINT16_C(n)
@@ -152,9 +157,6 @@ typedef uint32_t wheel_t;
 
 typedef uint16_t wheel_t;
 
-#define ctz(n) __builtin_ctz(n)
-#define fls(n) ((int)(sizeof (int) * CHAR_BIT) - __builtin_clz(n))
-
 #elif WHEEL_BIT == 3
 
 #define WHEEL_C(n) UINT8_C(n)
@@ -162,9 +164,6 @@ typedef uint16_t wheel_t;
 #define WHEEL_PRIx PRIx8
 
 typedef uint8_t wheel_t;
-
-#define ctz(n) __builtin_ctz(n)
-#define fls(n) ((int)(sizeof (int) * CHAR_BIT) - __builtin_clz(n))
 
 #else
 #error invalid WHEEL_BIT value
