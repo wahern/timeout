@@ -1,4 +1,4 @@
-all: bench bench-wheel.so bench-heap.so
+all: bench bench-wheel.so bench-heap.so test-timeout
 
 WHEEL_BIT = 6
 WHEEL_NUM = 4
@@ -27,6 +27,8 @@ timeout.o: timeout.c
 bench: bench.c timeout.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< -ldl
 
+test-timeout: timeout.o test-timeout.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ timeout.o test-timeout.o
 
 ifeq ($(shell uname -s), Darwin)
 SOFLAGS = -bundle -undefined dynamic_lookup
