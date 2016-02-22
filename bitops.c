@@ -25,18 +25,6 @@
 /* On MSVC, we have these handy functions. We can ignore their return
  * values, since we will never supply val == 0. */
 
-static __inline int ctz64(uint64_t val)
-{
-	DWORD zeros = 0;
-	_BitScanForward64(&zeros, val);
-	return zeros;
-}
-static __inline int clz64(uint64_t val)
-{
-	DWORD zeros = 0;
-	_BitScanReverse64(&zeros, val);
-	return zeros;
-}
 static __inline int ctz32(unsigned long val)
 {
 	DWORD zeros = 0;
@@ -49,6 +37,34 @@ static __inline int clz32(unsigned long val)
 	_BitScanReverse(&zeros, val);
 	return zeros;
 }
+#ifdef _WIN64
+/* According to the documentation, these only exist on Win64. */
+static __inline int ctz64(uint64_t val)
+{
+	DWORD zeros = 0;
+	_BitScanForward64(&zeros, val);
+	return zeros;
+}
+static __inline int clz64(uint64_t val)
+{
+	DWORD zeros = 0;
+	_BitScanReverse64(&zeros, val);
+	return zeros;
+}
+#else
+static __inline int ctz64(uint64_t val)
+{
+	uint32_t lo = (uint32_t) val;
+	uint32_t hi = (uint32_t) (val >> 32);
+	return lo ? ctz32(lo) : 32 + ctz32(hi);
+}
+static __inline int clz64(uint64_t val)
+{
+	uint32_t lo = (uint32_t) val;
+	uint32_t hi = (uint32_t) (val >> 32);
+	return hi ? clz32(hi) : 32 + clz32(lo);
+}
+#endif
 
 /* End of MSVC case. */
 
