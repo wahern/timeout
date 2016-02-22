@@ -1,23 +1,24 @@
 #!/usr/bin/env lua
 
-local lib = ... or "bench-wheel.so"
+local bench = require"bench"
+local aux = require"bench-aux"
 
+local lib = ... or "bench-wheel.so"
 local limit = 1000000
 local step  = limit / 100
-local bench = require"bench".new(lib, count)
-local clock = require"bench".clock
 
-bench:fill(limit)
+local B = bench.new(lib, count)
+
+B:fill(limit)
 local n = limit
 
 for i=0,limit,step do
-	bench:expire(n)
+	-- expire all timeouts
+	local expire_t = aux.time(B.expire, B, n)
 
-	local start = clock()
-	bench:fill(i)
+	-- add i timeouts
+	local fill_t = aux.time(B.fill, B, i)
 	n = i
-	local stop = clock()
 
-	print(i, math.floor((stop - start) * 1000000))
+	aux.say("%i\t%f\t(%f)", i, fill_t, expire_t)
 end
-

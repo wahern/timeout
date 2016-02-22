@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#define TIMEOUT_PUBLIC static
+
 #include "timeout.h"
 #include "timeout.c"
 #include "bench.h"

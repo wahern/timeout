@@ -4,7 +4,7 @@ WHEEL_BIT = 6
 WHEEL_NUM = 4
 
 CPPFLAGS = -DTIMEOUT_DEBUG
-CFLAGS = -O2 -g -Wall -Wextra -Wno-unused-parameter
+CFLAGS = -O2 -march=native -g -Wall -Wextra -Wno-unused-parameter
 
 timeout: CPPFLAGS+=-DWHEEL_BIT=$(WHEEL_BIT) -DWHEEL_NUM=$(WHEEL_NUM)
 
@@ -31,16 +31,20 @@ bench: bench.c timeout.h
 ifeq ($(shell uname -s), Darwin)
 SOFLAGS = -bundle -undefined dynamic_lookup
 else
-SOFLAGS = -shared
+SOFLAGS = -fPIC -shared
 endif
 
+# so bench.so can load implementation module from CWD
+LDFLAGS = -Wl,-rpath,.
+
+# clock_gettime in librt.so
 ifeq ($(shell uname -s), Linux)
 LIBS = -lrt
 endif
 
 
 bench.so: bench.c
-	$(CC) -o $@ $< $(CPPFLAGS) -DLUA_COMPAT_ALL $(CFLAGS) -Wno-unused-function $(SOFLAGS) $(LIBS)
+	$(CC) -o $@ $< $(CPPFLAGS) -DLUA_COMPAT_ALL $(CFLAGS) -Wno-unused-function $(SOFLAGS) $(LDFLAGS) $(LIBS)
 
 bench-wheel8.so: CPPFLAGS+=-DWHEEL_BIT=3 -DWHEEL_NUM=$(WHEEL_NUM)
 
