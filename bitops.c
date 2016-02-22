@@ -64,8 +64,6 @@ static __inline int clz32(unsigned long val)
 static inline int clz64(uint64_t x)
 {
 	int rv = 0;
-	if (!x)
-		return 64;
 
 	process64(32);
 	process64(16);
@@ -79,8 +77,6 @@ static inline int clz64(uint64_t x)
 static inline int clz32(uint32_t x)
 {
 	int rv = 0;
-	if (!x)
-		return 32;
 
 	process32(16);
 	process32(8);
