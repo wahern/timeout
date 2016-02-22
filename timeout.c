@@ -299,6 +299,7 @@ static inline reltime_t timeout_rem(struct timeouts *T, struct timeout *to) {
 
 
 static inline int timeout_wheel(timeout_t timeout) {
+	/* must be called with timeout != 0, so fls input is nonzero */
 	return (fls(MIN(timeout, TIMEOUT_MAX)) - 1) / WHEEL_BIT;
 } /* timeout_wheel() */
 
@@ -321,6 +322,11 @@ static void timeouts_sched(struct timeouts *T, struct timeout *to, timeout_t exp
 	if (expires > T->curtime) {
 		rem = timeout_rem(T, to);
 
+		/* rem is nonzero since:
+		 *   rem == timeout_rem(T,to),
+		 *       == to->expires - T->curtime
+		 *   and above we have expires > T->curtime.
+		 */
 		wheel = timeout_wheel(rem);
 		slot = timeout_slot(wheel, to->expires);
 
@@ -416,6 +422,7 @@ TIMEOUT_PUBLIC void timeouts_update(struct timeouts *T, abstime_t curtime) {
 		}
 
 		while (pending & T->pending[wheel]) {
+			/* ctz input cannot be zero: loop condition. */
 			int slot = ctz(pending & T->pending[wheel]);
 			TAILQ_CONCAT(&todo, &T->wheel[wheel][slot], tqe);
 			T->pending[wheel] &= ~(UINT64_C(1) << slot);
@@ -492,6 +499,8 @@ static timeout_t timeouts_int(struct timeouts *T) {
 		if (T->pending[wheel]) {
 			slot = WHEEL_MASK & (T->curtime >> (wheel * WHEEL_BIT));
 
+			/* ctz input cannot be zero: T->pending[wheel] is
+			 * nonzero, so rotr() is nonzero. */
 			_timeout = (ctz(rotr(T->pending[wheel], slot)) + !!wheel) << (wheel * WHEEL_BIT);
 			/* +1 to higher order wheels as those timeouts are one rotation in the future (otherwise they'd be on a lower wheel or expired) */
 

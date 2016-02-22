@@ -8,55 +8,46 @@
 #if defined(__GNUC__) && !defined(TIMEOUT_DISABLE_GNUC_BITOPS)
 
 /* On GCC and clang and some others, we can use __builtin functions. They
- * are not defined for n==0, however.*/
+ * are not defined for n==0, but timeout.s never calls them with n==0. */
 
-static inline int ctz64(uint64_t n)
-{
-	return n ? __builtin_ctzll(n) : 64;
-}
-static inline int clz64(uint64_t n)
-{
-	return n ? __builtin_clzll(n) : 64;
-}
+#define ctz64(n) __builtin_ctzll(n)
+#define clz64(n) __builtin_clzll(n)
 #if LONG_BITS == 32
-#define ctz32_(n) __builtin_ctzl(n)
-#define clz32_(n) __builtin_clzl(n)
+#define ctz32(n) __builtin_ctzl(n)
+#define clz32(n) __builtin_clzl(n)
 #else
-#define ctz32_(n) __builtin_ctz(n)
-#define clz32_(n) __builtin_clz(n)
+#define ctz32(n) __builtin_ctz(n)
+#define clz32(n) __builtin_clz(n)
 #endif
-static inline int ctz32(uint64_t n)
-{
-	return n ? ctz32_(n) : 32;
-}
-static inline int clz32(uint64_t n)
-{
-	return n ? clz32_(n) : 32;
-}
 
 #elif defined(_MSC_VER) && !defined(TIMEOUT_DISABLE_MSVC_BITOPS)
 
-/* On MSVC, we have these handy functions */
+/* On MSVC, we have these handy functions. We can ignore their return
+ * values, since we will never supply val == 0. */
 
 static __inline int ctz64(uint64_t val)
 {
 	DWORD zeros = 0;
-	return _BitScanForward64(&zeros, val) ? zeros : 64;
+	_BitScanForward64(&zeros, val);
+	return zeros;
 }
 static __inline int clz64(uint64_t val)
 {
 	DWORD zeros = 0;
-	return _BitScanReverse64(&zeros, val) ? zeros : 64;
+	_BitScanReverse64(&zeros, val);
+	return zeros;
 }
 static __inline int ctz32(unsigned long val)
 {
 	DWORD zeros = 0;
-	return _BitScanForward(&zeros, val) ? zeros : 32;
+	_BitScanForward(&zeros, val);
+	return zeros;
 }
 static __inline int clz32(unsigned long val)
 {
 	DWORD zeros = 0;
-	return _BitScanReverse(&zeros, val) ? zeros : 32;
+	_BitScanReverse(&zeros, val);
+	return zeros;
 }
 
 /* End of MSVC case. */
@@ -109,8 +100,6 @@ static inline int clz32(uint32_t x)
 static inline int ctz64(uint64_t x)
 {
 	int rv = 0;
-	if (!x)
-		return 64;
 
 	process64(32);
 	process64(16);
@@ -125,8 +114,6 @@ static inline int ctz64(uint64_t x)
 static inline int ctz32(uint32_t x)
 {
 	int rv = 0;
-	if (!x)
-		return 32;
 
 	process32(16);
 	process32(8);
@@ -189,6 +176,9 @@ check(uint64_t vv)
 {
 	uint32_t v32 = (uint32_t) vv;
 
+	if (vv == 0)
+		return 1; /* c[tl]z64(0) is undefined. */
+
 	if (ctz64(vv) != naive_ctz(64, vv)) {
 		printf("mismatch with ctz64: %d\n", ctz64(vv));
 				exit(1);
@@ -199,6 +189,10 @@ check(uint64_t vv)
 				exit(1);
 		return 0;
 	}
+
+	if (v32 == 0)
+		return 1; /* c[lt]z(0) is undefined. */
+
 	if (ctz32(v32) != naive_ctz(32, v32)) {
 		printf("mismatch with ctz32: %d\n", ctz32(v32));
 		exit(1);
