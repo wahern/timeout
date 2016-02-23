@@ -1,5 +1,4 @@
 set terminal postscript color
-set output "bench.eps"
 
 set key top left
 set xlabel "Number of timeouts"

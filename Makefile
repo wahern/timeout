@@ -87,7 +87,11 @@ bench-%.so: bench-%.c timeout.h
 	mv $@.tmp $@
 
 bench.eps: bench.plt $(foreach OP, add del expire, wheel-$(OP).dat heap-$(OP).dat)
-	gnuplot bench.plt
+	gnuplot bench.plt > $@.tmp
+	mv $@.tmp $@
+
+bench.pdf: bench.eps
+	ps2pdf $< $@
 
 .PHONY: clean clean~
 
