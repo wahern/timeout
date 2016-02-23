@@ -1,10 +1,11 @@
+CPPFLAGS = -DTIMEOUT_DEBUG
+CFLAGS = -O2 -march=native -g -Wall -Wextra -Wno-unused-parameter
+LUA = lua
+
 all: bench.so bench-wheel.so bench-heap.so bench-llrb.so
 
 WHEEL_BIT = 6
 WHEEL_NUM = 4
-
-CPPFLAGS = -DTIMEOUT_DEBUG
-CFLAGS = -O2 -march=native -g -Wall -Wextra -Wno-unused-parameter
 
 timeout: CPPFLAGS+=-DWHEEL_BIT=$(WHEEL_BIT) -DWHEEL_NUM=$(WHEEL_NUM)
 
@@ -73,11 +74,25 @@ bench-wheel.so: timeout.c
 bench-%.so: bench-%.c timeout.h
 	$(CC) -o $@ $< $(CPPFLAGS) $(CFLAGS) -Wno-unused-function $(SOFLAGS)
 
+%-add.dat: bench-%.so bench-add.lua bench-aux.lua bench.so
+	$(LUA) bench-add.lua $< > $@.tmp
+	mv $@.tmp $@
+
+%-del.dat: bench-%.so bench-del.lua bench-aux.lua bench.so
+	$(LUA) bench-del.lua $< > $@.tmp
+	mv $@.tmp $@
+
+%-expire.dat: bench-%.so bench-expire.lua bench-aux.lua bench.so
+	$(LUA) bench-expire.lua $< > $@.tmp
+	mv $@.tmp $@
+
+bench.eps: bench.plt $(foreach OP, add del expire, wheel-$(OP).dat heap-$(OP).dat)
+	gnuplot bench.plt
 
 .PHONY: clean clean~
 
 clean:
-	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM *.so *.o
+	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM *.so *.o *.dat
 
 clean~: clean
 	$(RM) *~
