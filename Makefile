@@ -92,7 +92,7 @@ bench.eps: bench.plt $(foreach OP, add del expire, wheel-$(OP).dat heap-$(OP).da
 .PHONY: clean clean~
 
 clean:
-	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM *.so *.o *.dat
+	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM *.so *.dat *.eps
 
 clean~: clean
 	$(RM) *~
