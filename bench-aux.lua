@@ -17,4 +17,14 @@ function aux.say(...)
 	print(string.format(...))
 end
 
+function aux.toboolean(s)
+	return tostring(s):match("^[1TtYy]") and true or false
+end
+
+function aux.optenv(k, def)
+	local s = os.getenv(k)
+
+	return (s and #s > 0 and s) or def
+end
+
 return aux

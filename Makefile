@@ -1,4 +1,4 @@
-all: bench.so bench-wheel.so bench-heap.so
+all: bench.so bench-wheel.so bench-heap.so bench-llrb.so
 
 WHEEL_BIT = 6
 WHEEL_NUM = 4
