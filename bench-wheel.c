@@ -57,6 +57,11 @@ static int empty(void *T) {
 } /* empty() */
 
 
+static struct timeout *next(void *T, struct timeouts_cursor *cur) {
+	return timeouts_next(T, cur);
+} /* next() */
+
+
 static void destroy(void *T) {
 	timeouts_close(T);
 } /* destroy() */
@@ -70,6 +75,7 @@ const struct benchops benchops = {
 	.update  = &update,
 	.check   = &check,
 	.empty   = &empty,
+	.next    = &next,
 	.destroy = &destroy
 };
 
