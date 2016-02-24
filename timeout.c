@@ -122,16 +122,24 @@
 #define WHEEL_MASK (WHEEL_LEN - 1)
 #define TIMEOUT_MAX ((TIMEOUT_C(1) << (WHEEL_BIT * WHEEL_NUM)) - 1)
 
-#if WHEEL_BIT == 6
+#include "bitops.c"
 
+#if WHEEL_BIT == 6
+#define ctz(n) ctz64(n)
+#define clz(n) clz64(n)
+#define fls(n) ((int)(64 - clz64(n)))
+#else
+#define ctz(n) ctz32(n)
+#define clz(n) clz32(n)
+#define fls(n) ((int)(32 - clz32(n)))
+#endif
+
+#if WHEEL_BIT == 6
 #define WHEEL_C(n) UINT64_C(n)
 #define WHEEL_PRIu PRIu64
 #define WHEEL_PRIx PRIx64
 
 typedef uint64_t wheel_t;
-
-#define ctz(n) __builtin_ctzll(n)
-#define fls(n) ((int)(sizeof (long long) * CHAR_BIT) - __builtin_clzll(n))
 
 #elif WHEEL_BIT == 5
 
@@ -141,9 +149,6 @@ typedef uint64_t wheel_t;
 
 typedef uint32_t wheel_t;
 
-#define ctz(n) __builtin_ctzl(n)
-#define fls(n) ((int)(sizeof (long) * CHAR_BIT) - __builtin_clzl(n))
-
 #elif WHEEL_BIT == 4
 
 #define WHEEL_C(n) UINT16_C(n)
@@ -152,9 +157,6 @@ typedef uint32_t wheel_t;
 
 typedef uint16_t wheel_t;
 
-#define ctz(n) __builtin_ctz(n)
-#define fls(n) ((int)(sizeof (int) * CHAR_BIT) - __builtin_clz(n))
-
 #elif WHEEL_BIT == 3
 
 #define WHEEL_C(n) UINT8_C(n)
@@ -162,9 +164,6 @@ typedef uint16_t wheel_t;
 #define WHEEL_PRIx PRIx8
 
 typedef uint8_t wheel_t;
-
-#define ctz(n) __builtin_ctz(n)
-#define fls(n) ((int)(sizeof (int) * CHAR_BIT) - __builtin_clz(n))
 
 #else
 #error invalid WHEEL_BIT value
@@ -300,6 +299,7 @@ static inline reltime_t timeout_rem(struct timeouts *T, struct timeout *to) {
 
 
 static inline int timeout_wheel(timeout_t timeout) {
+	/* must be called with timeout != 0, so fls input is nonzero */
 	return (fls(MIN(timeout, TIMEOUT_MAX)) - 1) / WHEEL_BIT;
 } /* timeout_wheel() */
 
@@ -322,6 +322,11 @@ static void timeouts_sched(struct timeouts *T, struct timeout *to, timeout_t exp
 	if (expires > T->curtime) {
 		rem = timeout_rem(T, to);
 
+		/* rem is nonzero since:
+		 *   rem == timeout_rem(T,to),
+		 *       == to->expires - T->curtime
+		 *   and above we have expires > T->curtime.
+		 */
 		wheel = timeout_wheel(rem);
 		slot = timeout_slot(wheel, to->expires);
 
@@ -417,6 +422,7 @@ TIMEOUT_PUBLIC void timeouts_update(struct timeouts *T, abstime_t curtime) {
 		}
 
 		while (pending & T->pending[wheel]) {
+			/* ctz input cannot be zero: loop condition. */
 			int slot = ctz(pending & T->pending[wheel]);
 			TAILQ_CONCAT(&todo, &T->wheel[wheel][slot], tqe);
 			T->pending[wheel] &= ~(UINT64_C(1) << slot);
@@ -493,6 +499,8 @@ static timeout_t timeouts_int(struct timeouts *T) {
 		if (T->pending[wheel]) {
 			slot = WHEEL_MASK & (T->curtime >> (wheel * WHEEL_BIT));
 
+			/* ctz input cannot be zero: T->pending[wheel] is
+			 * nonzero, so rotr() is nonzero. */
 			_timeout = (ctz(rotr(T->pending[wheel], slot)) + !!wheel) << (wheel * WHEEL_BIT);
 			/* +1 to higher order wheels as those timeouts are one rotation in the future (otherwise they'd be on a lower wheel or expired) */
 
