@@ -2,7 +2,7 @@ CPPFLAGS = -DTIMEOUT_DEBUG
 CFLAGS = -O2 -march=native -g -Wall -Wextra -Wno-unused-parameter
 LUA = lua
 
-all: bench.so bench-wheel.so bench-heap.so bench-llrb.so
+all: bench.so bench-wheel.so bench-heap.so bench-llrb.so test-timeout
 
 WHEEL_BIT = 6
 WHEEL_NUM = 4
@@ -28,6 +28,8 @@ timeout.o: timeout.c
 bench: bench.c timeout.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< -ldl
 
+test-timeout: timeout.o test-timeout.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ timeout.o test-timeout.o
 
 ifeq ($(shell uname -s), Darwin)
 SOFLAGS = -bundle -undefined dynamic_lookup
@@ -86,7 +88,9 @@ bench-%.so: bench-%.c timeout.h
 	$(LUA) bench-expire.lua $< > $@.tmp
 	mv $@.tmp $@
 
-bench.eps: bench.plt $(foreach OP, add del expire, wheel-$(OP).dat heap-$(OP).dat)
+DATS =  $(foreach OP, add del expire, wheel-$(OP).dat heap-$(OP).dat)
+
+bench.eps: bench.plt $(DATS)
 	gnuplot bench.plt > $@.tmp
 	mv $@.tmp $@
 
@@ -96,7 +100,11 @@ bench.pdf: bench.eps
 .PHONY: clean clean~
 
 clean:
-	$(RM) -r timeout timeout8 timeout16 timeout32 timeout64 *.dSYM *.so *.dat *.eps
+	$(RM) timeout timeout8 timeout16 timeout32 timeout64
+	$(RM) test-timeout *.o
+	$(RM) bench.so bench-*.so
+	$(RM) -r *.dSYM
+	$(RM) $(DATS) bench.eps bench.pdf
 
 clean~: clean
 	$(RM) *~
