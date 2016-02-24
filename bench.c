@@ -185,10 +185,10 @@ static int bench_empty(lua_State *L) {
 
 static int bench__next(lua_State *L) {
 	struct bench *B = lua_touserdata(L, lua_upvalueindex(1));
-	struct timeouts_cursor *cursor = lua_touserdata(L, lua_upvalueindex(2));
+	struct timeouts_it *it = lua_touserdata(L, lua_upvalueindex(2));
 	struct timeout *to;
 
-	if (!B->ops.next || !(to = B->ops.next(B->state, cursor)))
+	if (!B->ops.next || !(to = B->ops.next(B->state, it)))
 		return 0;
 
 	lua_pushinteger(L, luaL_optinteger(L, 2, 0) + 1);
@@ -201,12 +201,12 @@ static int bench__next(lua_State *L) {
 } /* bench__next() */
 
 static int bench__pairs(lua_State *L) {
-	struct timeouts_cursor *cursor;
+	struct timeouts_it *it;
 
 	lua_settop(L, 1);
 
-	cursor = lua_newuserdata(L, sizeof *cursor);
-	TIMEOUTS_CURSOR_INIT(cursor, TIMEOUTS_ALL);
+	it = lua_newuserdata(L, sizeof *it);
+	TIMEOUTS_IT_INIT(it, TIMEOUTS_ALL);
 
 	lua_pushcclosure(L, &bench__next, 2);
 	lua_pushvalue(L, 1);

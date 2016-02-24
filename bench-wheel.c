@@ -57,8 +57,8 @@ static int empty(void *T) {
 } /* empty() */
 
 
-static struct timeout *next(void *T, struct timeouts_cursor *cur) {
-	return timeouts_next(T, cur);
+static struct timeout *next(void *T, struct timeouts_it *it) {
+	return timeouts_next(T, it);
 } /* next() */
 
 

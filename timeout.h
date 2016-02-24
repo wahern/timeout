@@ -46,9 +46,9 @@
 #define TIMEOUT_VERSION TIMEOUT_V_REL
 #define TIMEOUT_VENDOR  "william@25thandClement.com"
 
-#define TIMEOUT_V_REL 0x20140103
-#define TIMEOUT_V_ABI 0x20140103
-#define TIMEOUT_V_API 0x20140103
+#define TIMEOUT_V_REL 0x20160224
+#define TIMEOUT_V_ABI 0x20160224
+#define TIMEOUT_V_API 0x20160224
 
 TIMEOUT_PUBLIC int timeout_version(void);
 
@@ -115,18 +115,8 @@ struct timeout_cb {
 struct timeout {
 	int flags;
 
-#ifndef TIMEOUT_DISABLE_INTERVALS
-	timeout_t interval;
-	/* timeout interval if periodic */
-#endif
-
 	timeout_t expires;
 	/* absolute expiration time */
-
-#ifndef TIMEOUT_DISABLE_RELATIVE_ACCESS
-	struct timeouts *timeouts;
-	/* timeouts collection if member of */
-#endif
 
 	struct timeout_list *pending;
 	/* timeout list if pending on wheel or expiry queue */
@@ -134,8 +124,20 @@ struct timeout {
 	TAILQ_ENTRY(timeout) tqe;
 	/* entry member for struct timeout_list lists */
 
+#ifndef TIMEOUT_DISABLE_CALLBACKS
 	struct timeout_cb callback;
 	/* optional callback information */
+#endif
+
+#ifndef TIMEOUT_DISABLE_INTERVALS
+	timeout_t interval;
+	/* timeout interval if periodic */
+#endif
+
+#ifndef TIMEOUT_DISABLE_RELATIVE_ACCESS
+	struct timeouts *timeouts;
+	/* timeouts collection if member of */
+#endif
 }; /* struct timeout */
 
 
@@ -200,29 +202,29 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *, FILE *);
 #define TIMEOUTS_EXPIRED 0x20
 #define TIMEOUTS_ALL     (TIMEOUTS_PENDING|TIMEOUTS_EXPIRED)
 
-#define TIMEOUTS_CURSOR_INITIALIZER(flags) { (flags) }
+#define TIMEOUTS_IT_INITIALIZER(flags) { (flags) }
 
-#define TIMEOUTS_CURSOR_INIT(cur, _flags) do {                          \
+#define TIMEOUTS_IT_INIT(cur, _flags) do {                              \
 	(cur)->flags = (_flags);                                        \
 	(cur)->pc = 0;                                                  \
 } while (0)
 
-struct timeouts_cursor {
+struct timeouts_it {
 	int flags;
 	unsigned pc, i, j;
 	struct timeout *to;
-}; /* struct timeouts_cursor */
+}; /* struct timeouts_it */
 
-TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *, struct timeouts_cursor *);
+TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *, struct timeouts_it *);
 /* return next timeout in pending wheel or expired queue. caller can delete
  * the returned timeout, but should not otherwise manipulate the timing
  * wheel. in particular, caller SHOULD NOT delete any other timeout as that
  * could invalidate cursor state and trigger a use-after-free.
  */
 
-#define TIMEOUTS_FOREACH(var, T, flags) \
-	struct timeouts_cursor _foreach_cursor = TIMEOUTS_CURSOR_INITIALIZER((flags)); \
-	while (((var) = timeouts_next((T), &_foreach_cursor)))
+#define TIMEOUTS_FOREACH(var, T, flags)                                 \
+	struct timeouts_it _it = TIMEOUTS_IT_INITIALIZER((flags));      \
+	while (((var) = timeouts_next((T), &_it)))
 
 
 /*

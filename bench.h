@@ -6,6 +6,6 @@ struct benchops {
 	void (*update)(void *, timeout_t);
 	void (*check)(void *);
 	int (*empty)(void *);
-	struct timeout *(*next)(void *, struct timeouts_cursor *);
+	struct timeout *(*next)(void *, struct timeouts_it *);
 	void (*destroy)(void *);
 }; /* struct benchops() */

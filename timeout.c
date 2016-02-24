@@ -631,12 +631,12 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *T, FILE *fp) {
 #define ENTER                                                           \
 	do {                                                            \
 	static const int pc0 = __LINE__;                                \
-	switch (pc0 + cur->pc) {                                        \
+	switch (pc0 + it->pc) {                                         \
 	case __LINE__: (void)0
 
 #define SAVE_AND_DO(do_statement)                                       \
 	do {                                                            \
-		cur->pc = __LINE__ - pc0;                               \
+		it->pc = __LINE__ - pc0;                                \
 		do_statement;                                           \
 		case __LINE__: (void)0;                                 \
 	} while (0)
@@ -649,21 +649,21 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *T, FILE *fp) {
 	}                                                               \
 	} while (0)
 
-TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *T, struct timeouts_cursor *cur) {
+TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *T, struct timeouts_it *it) {
 	struct timeout *to;
 
 	ENTER;
 
-	if (cur->flags & TIMEOUTS_EXPIRED) {
-		TAILQ_FOREACH_SAFE(to, &T->expired, tqe, cur->to) {
+	if (it->flags & TIMEOUTS_EXPIRED) {
+		TAILQ_FOREACH_SAFE(to, &T->expired, tqe, it->to) {
 			YIELD(to);
 		}
 	}
 
-	if (cur->flags & TIMEOUTS_PENDING) {
-		for (cur->i = 0; cur->i < countof(T->wheel); cur->i++) {
-			for (cur->j = 0; cur->j < countof(T->wheel[cur->i]); cur->j++) {
-				TAILQ_FOREACH_SAFE(to, &T->wheel[cur->i][cur->j], tqe, cur->to) {
+	if (it->flags & TIMEOUTS_PENDING) {
+		for (it->i = 0; it->i < countof(T->wheel); it->i++) {
+			for (it->j = 0; it->j < countof(T->wheel[it->i]); it->j++) {
+				TAILQ_FOREACH_SAFE(to, &T->wheel[it->i][it->j], tqe, it->to) {
 					YIELD(to);
 				}
 			}
