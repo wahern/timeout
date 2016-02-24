@@ -79,6 +79,13 @@
 } while (0)
 #endif
 
+#if !defined TAILQ_FOREACH_SAFE
+#define TAILQ_FOREACH_SAFE(var, head, field, tvar)                      \
+	for ((var) = TAILQ_FIRST(head);                                 \
+	    (var) && ((tvar) = TAILQ_NEXT(var, field), 1);              \
+	    (var) = (tvar))
+#endif
+
 
 /*
  * B I T  M A N I P U L A T I O N  R O U T I N E S
@@ -587,24 +594,6 @@ static struct timeout *timeouts_min(struct timeouts *T) {
 	} \
 } while (0)
 
-TIMEOUT_PUBLIC int timeouts_foreach(struct timeouts *T, int (*fp)(struct timeout *, void *), void *cb_arg)
-{
-	struct timeout *to = NULL;
-	int rv;
-	unsigned i, j;
-
-	for (i = 0; i < countof(T->wheel); i++) {
-		for (j = 0; j < countof(T->wheel[i]); j++) {
-			TAILQ_FOREACH(to, &T->wheel[i][j], tqe) {
-				rv = fp(to,cb_arg);
-				if (rv)
-					return rv;
-			}
-		}
-	}
-	return 0;
-} /* timeouts_foreach */
-
 TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *T, FILE *fp) {
 	timeout_t timeout;
 	struct timeout *to;
@@ -628,6 +617,59 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *T, FILE *fp) {
 
 	return 1;
 } /* timeouts_check() */
+
+
+#define ENTER                                                           \
+	do {                                                            \
+	static const int pc0 = __LINE__;                                \
+	switch (pc0 + cur->pc) {                                        \
+	case __LINE__: (void)0
+
+#define SAVE_AND_DO(do_statement)                                       \
+	do {                                                            \
+		cur->pc = __LINE__ - pc0;                               \
+		do_statement;                                           \
+		case __LINE__: (void)0;                                 \
+	} while (0)
+
+#define YIELD(rv)                                                       \
+	SAVE_AND_DO(return (rv))
+
+#define LEAVE                                                           \
+	SAVE_AND_DO(break);                                             \
+	}                                                               \
+	} while (0)
+
+TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *T, struct timeouts_cursor *cur) {
+	struct timeout *to;
+
+	ENTER;
+
+	if (cur->flags & TIMEOUTS_EXPIRED) {
+		TAILQ_FOREACH_SAFE(to, &T->expired, tqe, cur->to) {
+			YIELD(to);
+		}
+	}
+
+	if (cur->flags & TIMEOUTS_PENDING) {
+		for (cur->i = 0; cur->i < countof(T->wheel); cur->i++) {
+			for (cur->j = 0; cur->j < countof(T->wheel[cur->i]); cur->j++) {
+				TAILQ_FOREACH_SAFE(to, &T->wheel[cur->i][cur->j], tqe, cur->to) {
+					YIELD(to);
+				}
+			}
+		}
+	}
+
+	LEAVE;
+
+	return NULL;
+} /* timeouts_next */
+
+#undef LEAVE
+#undef YIELD
+#undef SAVE_AND_DO
+#undef ENTER
 
 
 /*

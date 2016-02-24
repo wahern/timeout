@@ -183,6 +183,39 @@ static int bench_empty(lua_State *L) {
 } /* bench_empty() */
 
 
+static int bench__next(lua_State *L) {
+	struct bench *B = lua_touserdata(L, lua_upvalueindex(1));
+	struct timeouts_cursor *cursor = lua_touserdata(L, lua_upvalueindex(2));
+	struct timeout *to;
+
+	if (!B->ops.next || !(to = B->ops.next(B->state, cursor)))
+		return 0;
+
+	lua_pushinteger(L, luaL_optinteger(L, 2, 0) + 1);
+
+	lua_newtable(L);
+	lua_pushinteger(L, to->expires);
+	lua_setfield(L, -2, "expires");
+
+	return 2;
+} /* bench__next() */
+
+static int bench__pairs(lua_State *L) {
+	struct timeouts_cursor *cursor;
+
+	lua_settop(L, 1);
+
+	cursor = lua_newuserdata(L, sizeof *cursor);
+	TIMEOUTS_CURSOR_INIT(cursor, TIMEOUTS_ALL);
+
+	lua_pushcclosure(L, &bench__next, 2);
+	lua_pushvalue(L, 1);
+	lua_pushinteger(L, 0);
+
+	return 3;
+} /* bench__pairs() */
+
+
 static int bench__gc(lua_State *L) {
 	struct bench *B = lua_touserdata(L, 1);
 
@@ -206,8 +239,9 @@ static const luaL_Reg bench_methods[] = {
 };
 
 static const luaL_Reg bench_metatable[] = {
-	{ "__gc", &bench__gc },
-	{ NULL,   NULL }
+	{ "__pairs", &bench__pairs },
+	{ "__gc",    &bench__gc },
+	{ NULL,      NULL }
 };
 
 static const luaL_Reg bench_globals[] = {

@@ -189,10 +189,34 @@ TIMEOUT_PUBLIC bool timeouts_expired(struct timeouts *);
 TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *, FILE *);
 /* return true if invariants hold. describes failures to optional file handle. */
 
-TIMEOUT_PUBLIC int timeouts_foreach(struct timeouts *, int (*fn)(struct timeout *, void *), void *);
-/* Run fn(timeout,arg) on every pending or expired timeout in the wheel. If
- * any iteration returns nonzero, return the nonzero value immediately and
- * stop looping. */
+#define TIMEOUTS_PENDING 0x10
+#define TIMEOUTS_EXPIRED 0x20
+#define TIMEOUTS_ALL     (TIMEOUTS_PENDING|TIMEOUTS_EXPIRED)
+
+#define TIMEOUTS_CURSOR_INITIALIZER(flags) { (flags) }
+
+#define TIMEOUTS_CURSOR_INIT(cur, _flags) do {                          \
+	(cur)->flags = (_flags);                                        \
+	(cur)->pc = 0;                                                  \
+} while (0)
+
+struct timeouts_cursor {
+	int flags;
+	unsigned pc, i, j;
+	struct timeout *to;
+}; /* struct timeouts_cursor */
+
+TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *, struct timeouts_cursor *);
+/* return next timeout in pending wheel or expired queue. caller can delete
+ * the returned timeout, but should not otherwise manipulate the timing
+ * wheel. in particular, caller SHOULD NOT delete any other timeout as that
+ * could invalidate cursor state and trigger a use-after-free.
+ */
+
+#define TIMEOUTS_FOREACH(var, T, flags) \
+	struct timeouts_cursor _foreach_cursor = TIMEOUTS_CURSOR_INITIALIZER((flags)); \
+	while (((var) = timeouts_next((T), &_foreach_cursor)))
+
 
 /*
  * B O N U S  W H E E L  I N T E R F A C E S
