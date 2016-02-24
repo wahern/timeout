@@ -265,8 +265,8 @@ static void timeouts_reset(struct timeouts *T) {
 	TAILQ_CONCAT(&reset, &T->expired, tqe);
 
 	TAILQ_FOREACH(to, &reset, tqe) {
-		TO_SET_TIMEOUTS(to, NULL);
 		to->pending = NULL;
+		TO_SET_TIMEOUTS(to, NULL);
 	}
 } /* timeouts_reset() */
 
@@ -353,6 +353,7 @@ static void timeouts_sched(struct timeouts *T, struct timeout *to, timeout_t exp
 } /* timeouts_sched() */
 
 
+#ifndef TIMEOUT_DISABLE_INTERVALS
 static void timeouts_readd(struct timeouts *T, struct timeout *to) {
 	to->expires += to->interval;
 
@@ -373,11 +374,14 @@ static void timeouts_readd(struct timeouts *T, struct timeout *to) {
 
 	timeouts_sched(T, to, to->expires);
 } /* timeouts_readd() */
+#endif
 
 
 TIMEOUT_PUBLIC void timeouts_add(struct timeouts *T, struct timeout *to, timeout_t timeout) {
+#ifndef TIMEOUT_DISABLE_INTERVALS
 	if (to->flags & TIMEOUT_INT)
 		to->interval = MAX(1, timeout);
+#endif
 
 	if (to->flags & TIMEOUT_ABS)
 		timeouts_sched(T, to, timeout);
@@ -453,7 +457,7 @@ TIMEOUT_PUBLIC void timeouts_update(struct timeouts *T, abstime_t curtime) {
 		struct timeout *to = TAILQ_FIRST(&todo);
 
 		TAILQ_REMOVE(&todo, to, tqe);
-		to->pending = 0;
+		to->pending = NULL;
 
 		timeouts_sched(T, to, to->expires);
 	}
@@ -547,13 +551,13 @@ TIMEOUT_PUBLIC struct timeout *timeouts_get(struct timeouts *T) {
 		struct timeout *to = TAILQ_FIRST(&T->expired);
 
 		TAILQ_REMOVE(&T->expired, to, tqe);
-		to->pending = 0;
+		to->pending = NULL;
+		TO_SET_TIMEOUTS(to, NULL);
 
-		if ((to->flags & TIMEOUT_INT) && to->interval > 0) {
+#ifndef TIMEOUT_DISABLE_INTERVALS
+		if ((to->flags & TIMEOUT_INT) && to->interval > 0)
 			timeouts_readd(T, to);
-		} else {
-			TO_SET_TIMEOUTS(to, NULL);
-		}
+#endif
 
 		return to;
 	} else {
