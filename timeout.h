@@ -202,7 +202,7 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *, FILE *);
 #define TIMEOUTS_EXPIRED 0x20
 #define TIMEOUTS_ALL     (TIMEOUTS_PENDING|TIMEOUTS_EXPIRED)
 
-#define TIMEOUTS_IT_INITIALIZER(flags) { (flags) }
+#define TIMEOUTS_IT_INITIALIZER(flags) { (flags), 0, 0, 0, 0 }
 
 #define TIMEOUTS_IT_INIT(cur, _flags) do {                              \
 	(cur)->flags = (_flags);                                        \
