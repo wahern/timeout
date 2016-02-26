@@ -80,15 +80,18 @@ static int check_randomized(const struct rand_cfg *cfg)
 	struct timeout *t = calloc(cfg->n_timeouts, sizeof(struct timeout));
 	timeout_t *timeouts = calloc(cfg->n_timeouts, sizeof(timeout_t));
 	uint8_t *fired = calloc(cfg->n_timeouts, sizeof(uint8_t));
+        uint8_t *found = calloc(cfg->n_timeouts, sizeof(uint8_t));
 	uint8_t *deleted = calloc(cfg->n_timeouts, sizeof(uint8_t));
 	struct timeouts *tos = timeouts_open(0, &err);
 	timeout_t now = cfg->start_at;
-	int n_added_pending = 0;
-	int n_added_expired = 0;
+	int n_added_pending = 0, cnt_added_pending = 0;
+	int n_added_expired = 0, cnt_added_expired = 0;
+        struct timeouts_it it_p, it_e, it_all;
+        int p_done = 0, e_done = 0, all_done = 0;
 	struct timeout *to = NULL;
 	const int rel = cfg->relative;
 
-	if (!t || !timeouts || !tos || !fired || !deleted)
+	if (!t || !timeouts || !tos || !fired || !found || !deleted)
 		FAIL();
 	timeouts_update(tos, cfg->start_at);
 
@@ -121,6 +124,51 @@ static int check_randomized(const struct rand_cfg *cfg)
 	if (!!n_added_pending != timeouts_pending(tos))
 		FAIL();
 	if (!!n_added_expired != timeouts_expired(tos))
+		FAIL();
+
+        /* Test foreach, interleaving a few iterators. */
+        TIMEOUTS_IT_INIT(&it_p, TIMEOUTS_PENDING);
+        TIMEOUTS_IT_INIT(&it_e, TIMEOUTS_EXPIRED);
+        TIMEOUTS_IT_INIT(&it_all, TIMEOUTS_ALL);
+        while (! (p_done && e_done && all_done)) {
+		if (!p_done) {
+			to = timeouts_next(tos, &it_p);
+			if (to) {
+				i = to - &t[0];
+				++found[i];
+				++cnt_added_pending;
+			} else {
+				p_done = 1;
+			}
+		}
+		if (!e_done) {
+			to = timeouts_next(tos, &it_e);
+			if (to) {
+				i = to - &t[0];
+				++found[i];
+				++cnt_added_expired;
+			} else {
+				e_done = 1;
+			}
+		}
+		if (!all_done) {
+			to = timeouts_next(tos, &it_all);
+			if (to) {
+				i = to - &t[0];
+				++found[i];
+			} else {
+				all_done = 1;
+			}
+		}
+        }
+
+	for (i = 0; i < cfg->n_timeouts; ++i) {
+		if (found[i] != 2)
+			FAIL();
+	}
+	if (cnt_added_expired != n_added_expired)
+		FAIL();
+	if (cnt_added_pending != n_added_pending)
 		FAIL();
 
 	while (NULL != (to = timeouts_get(tos))) {
@@ -215,6 +263,7 @@ static int check_randomized(const struct rand_cfg *cfg)
 	if (timeouts) free(timeouts);
 	if (tos) timeouts_close(tos);
 	if (fired) free(fired);
+	if (found) free(found);
 	if (deleted) free(deleted);
 	return rv;
 }
