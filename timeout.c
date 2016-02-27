@@ -40,7 +40,7 @@
 #include "timeout.h"
 
 #if TIMEOUT_DEBUG - 0
-#include "debug.h"
+#include "timeout-debug.h"
 #endif
 
 #ifdef TIMEOUT_DISABLE_RELATIVE_ACCESS
@@ -134,7 +134,7 @@
 #define WHEEL_MASK (WHEEL_LEN - 1)
 #define TIMEOUT_MAX ((TIMEOUT_C(1) << (WHEEL_BIT * WHEEL_NUM)) - 1)
 
-#include "bitops.c"
+#include "timeout-bitops.c"
 
 #if WHEEL_BIT == 6
 #define ctz(n) ctz64(n)
@@ -655,8 +655,14 @@ TIMEOUT_PUBLIC struct timeout *timeouts_next(struct timeouts *T, struct timeouts
 	ENTER;
 
 	if (it->flags & TIMEOUTS_EXPIRED) {
-		TAILQ_FOREACH_SAFE(to, &T->expired, tqe, it->to) {
-			YIELD(to);
+		if (it->flags & TIMEOUTS_CLEAR) {
+			while ((to = timeouts_get(T))) {
+				YIELD(to);
+			}
+		} else {
+			TAILQ_FOREACH_SAFE(to, &T->expired, tqe, it->to) {
+				YIELD(to);
+			}
 		}
 	}
 

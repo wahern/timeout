@@ -19,7 +19,7 @@ for i=0,limit,step do
 	-- expire timeouts by iteratively updating clock. exp_step is the
 	-- approximate number of timeouts (as a fraction of the total number
 	-- of timeouts) that will expire per update.
-	local exp_elapsed, exp_count = aux.time(B.expire, B, fill_count, fill_last * exp_step)
+	local exp_elapsed, exp_count = aux.time(B.expire, B, fill_count, math.floor(fill_last * exp_step))
 	assert(exp_count == i)
 	assert(B:empty())
 	local exp_rate = i > 0 and i / exp_elapsed or 0

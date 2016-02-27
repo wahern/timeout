@@ -46,9 +46,9 @@
 #define TIMEOUT_VERSION TIMEOUT_V_REL
 #define TIMEOUT_VENDOR  "william@25thandClement.com"
 
-#define TIMEOUT_V_REL 0x20160224
+#define TIMEOUT_V_REL 0x20160226
 #define TIMEOUT_V_ABI 0x20160224
-#define TIMEOUT_V_API 0x20160224
+#define TIMEOUT_V_API 0x20160226
 
 TIMEOUT_PUBLIC int timeout_version(void);
 
@@ -201,6 +201,7 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *, FILE *);
 #define TIMEOUTS_PENDING 0x10
 #define TIMEOUTS_EXPIRED 0x20
 #define TIMEOUTS_ALL     (TIMEOUTS_PENDING|TIMEOUTS_EXPIRED)
+#define TIMEOUTS_CLEAR   0x40
 
 #define TIMEOUTS_IT_INITIALIZER(flags) { (flags), 0, 0, 0, 0 }
 

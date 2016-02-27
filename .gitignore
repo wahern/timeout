@@ -3,9 +3,5 @@
 *.gcov
 *.gcno
 *~
-/test-timeout
-/bench
-/bench-heap.so
-/bench-llrb.so
-/bench-wheel.so
-/bench.so
+*.so
+*.dSYM
