@@ -226,6 +226,7 @@ struct intervals_cfg {
 	int n_timeouts;
 	timeout_t start_at;
 	timeout_t end_at;
+	timeout_t skip;
 };
 
 int
@@ -261,23 +262,35 @@ check_intervals(struct intervals_cfg *cfg)
 
 	while (now < cfg->end_at) {
 		timeout_t delay = timeouts_timeout(tos);
+		if (cfg->skip && delay < cfg->skip)
+			delay = cfg->skip;
 		timeouts_step(tos, delay);
-
 		now += delay;
 
 		while (NULL != (to = timeouts_get(tos))) {
 			i = to - &t[0];
 			assert(&t[i] == to);
 			fired[i]++;
+			if (0 != (to->expires - cfg->start_at) % cfg->timeouts[i])
+				FAIL();
+			if (to->expires <= now)
+				FAIL();
+			if (to->expires > now + cfg->timeouts[i])
+				FAIL();
 		}
 		if (!timeouts_check(tos, stderr))
 			FAIL();
 	}
 
-	timeout_t duration = cfg->end_at - cfg->start_at;
+	timeout_t duration = now - cfg->start_at;
 	for (i = 0; i < cfg->n_timeouts; ++i) {
-		if (fired[i] != duration / cfg->timeouts[i])
-			FAIL();
+		if (cfg->skip) {
+			if (fired[i] > duration / cfg->timeouts[i])
+				FAIL();
+		} else {
+			if (fired[i] != duration / cfg->timeouts[i])
+				FAIL();
+		}
 		if (!timeout_pending(&t[i]))
 			FAIL();
 	}
@@ -420,25 +433,36 @@ main(int argc, char **argv)
 		.n_timeouts = sizeof(primes)/sizeof(timeout_t),
 		.start_at = 50,
 		.end_at = 5322,
+		.skip = 0,
 	};
 	DO(check_intervals(&icfg1));
 
 	struct intervals_cfg icfg2 = {
-		.timeouts = primes,
+		.timeouts = factors_of_1337,
 		.n_timeouts = sizeof(factors_of_1337)/sizeof(timeout_t),
 		.start_at = 50,
 		.end_at = 50000,
+		.skip = 0,
 	};
 	DO(check_intervals(&icfg2));
 
 	struct intervals_cfg icfg3 = {
-		.timeouts = primes,
+		.timeouts = multiples_of_five,
 		.n_timeouts = sizeof(multiples_of_five)/sizeof(timeout_t),
 		.start_at = 49,
 		.end_at = 5333,
+		.skip = 0,
 	};
 	DO(check_intervals(&icfg3));
 
+	struct intervals_cfg icfg4 = {
+		.timeouts = primes,
+		.n_timeouts = sizeof(primes)/sizeof(timeout_t),
+		.start_at = 50,
+		.end_at = 5322,
+		.skip = 16,
+	};
+	DO(check_intervals(&icfg4));
 
         if (n_failed) {
           puts("\nFAIL");

@@ -358,18 +358,13 @@ static void timeouts_readd(struct timeouts *T, struct timeout *to) {
 	to->expires += to->interval;
 
 	if (to->expires <= T->curtime) {
-		if (to->expires < T->curtime) {
-			timeout_t n = T->curtime - to->expires;
-			timeout_t q = n / to->interval;
-			timeout_t r = n % to->interval;
-
-			if (r)
-				to->expires += (to->interval * q) + (to->interval - r);
-			else
-				to->expires += (to->interval * q);
-		} else {
-			to->expires += to->interval;
-		}
+		/* If we've missed the next firing of this timeout, reschedule
+		 * it to occur at the next multiple of its interval after
+		 * the last time that it fired.
+		 */
+		timeout_t n = T->curtime - to->expires;
+		timeout_t r = n % to->interval;
+		to->expires = T->curtime + (to->interval - r);
 	}
 
 	timeouts_sched(T, to, to->expires);
