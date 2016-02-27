@@ -206,14 +206,16 @@ static int check_randomized(const struct rand_cfg *cfg)
 		if (cfg->finalize > 1) {
 			if (timeouts_get(tos))
 				FAIL();
+			TIMEOUTS_FOREACH(to, tos, TIMEOUTS_ALL)
+				FAIL();
 		}
 	}
 	rv = 0;
 
  done:
+	if (tos) timeouts_close(tos);
 	if (t) free(t);
 	if (timeouts) free(timeouts);
-	if (tos) timeouts_close(tos);
 	if (fired) free(fired);
 	if (deleted) free(deleted);
 	return rv;
