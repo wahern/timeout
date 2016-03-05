@@ -3,6 +3,12 @@
 #include <intrin.h>     /* _BitScanForward, _BitScanReverse */
 #endif
 
+/*
+ * L E A D I N G   A N D   T R A I L I N G   Z E R O S
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
 /* First define ctz and clz functions; these are compiler-dependent if
  * you want them to be fast. */
 #if defined(__GNUC__) && !defined(TIMEOUT_DISABLE_GNUC_BITOPS)
@@ -141,7 +147,37 @@ static inline int ctz32(uint32_t x)
 
 /* End of generic case */
 
-#endif /* End of defining ctz */
+#endif /* End of defining ctz and clz. */
+
+
+/*
+ * B I T W I S E   R O T A T I O N
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
+#define DECLARE_ROTATE_(bits, type)					\
+	static inline type rotl##bits(const type v, int c)	{ 	\
+		if (!(c &= ((bits)-1)))					\
+			return v;					\
+									\
+		return (v << c) | (v >> ((bits) - c));			\
+	} /* rotl() */							\
+									\
+	static inline type rotr##bits(const type v, int c) {		\
+		if (!(c &= ((bits)-1)))					\
+			return v;					\
+									\
+		return (v >> c) | (v << ((bits) - c));			\
+	} /* rotr() */
+
+#define DECLARE_ROTATE(bits)                    \
+	DECLARE_ROTATE_(bits, uint##bits##_t)
+
+DECLARE_ROTATE(64);
+DECLARE_ROTATE(32);
+DECLARE_ROTATE(16);
+DECLARE_ROTATE(8);
 
 #ifdef TEST_BITOPS
 #include <stdio.h>
@@ -183,10 +219,64 @@ naive_ctz(int bits, uint64_t v)
 	return r;
 }
 
+static uint64_t naive_rotl(int n_bits, uint64_t v, int c)
+{
+	uint64_t r = 0;
+	int i;
+	for (i = 0; i < n_bits; ++i) {
+		if (v & ((uint64_t)1)<<i) {
+			r |= ((uint64_t)1) << ((i+c)%n_bits);
+		}
+	}
+	return r;
+}
+static uint64_t naive_rotr(int n_bits, uint64_t v, int c)
+{
+	c %= n_bits;
+	return naive_rotl(n_bits, v, n_bits-c);
+}
+
+
 static int
 check(uint64_t vv)
 {
 	uint32_t v32 = (uint32_t) vv;
+	int j;
+
+	for (j = 0; j < 64; ++j) {
+		if (rotr64(vv, j) != naive_rotr(64, vv, j)) {
+			printf("mismatch with rotr64");
+			exit(1);
+		}
+		if (rotl64(vv, j) != naive_rotl(64, vv, j)) {
+			printf("mismatch with rotl64");
+			exit(1);
+		}
+		if (rotr32(vv, j) != naive_rotr(32, vv, j)) {
+			printf("mismatch with rotr32");
+			exit(1);
+		}
+		if (rotl32(vv, j) != naive_rotl(32, vv, j)) {
+			printf("mismatch with rotl32");
+			exit(1);
+		}
+		if (rotr16(vv, j) != naive_rotr(16, vv, j)) {
+			printf("mismatch with rotr16");
+			exit(1);
+		}
+		if (rotl16(vv, j) != naive_rotl(16, vv, j)) {
+			printf("mismatch with rotl16");
+			exit(1);
+		}
+		if (rotr8(vv, j) != naive_rotr(8, vv, j)) {
+			printf("mismatch with rotr8");
+			exit(1);
+		}
+		if (rotl8(vv, j) != naive_rotl(8, vv, j)) {
+			printf("mismatch with rotl8");
+			exit(1);
+		}
+	}
 
 	if (vv == 0)
 		return 1; /* c[tl]z64(0) is undefined. */

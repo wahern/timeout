@@ -153,6 +153,9 @@
 
 typedef uint64_t wheel_t;
 
+#define rotr(v,c) rotr64((v),(c))
+#define rotl(v,c) rotl64((v),(c))
+
 #elif WHEEL_BIT == 5
 
 #define WHEEL_C(n) UINT32_C(n)
@@ -160,6 +163,9 @@ typedef uint64_t wheel_t;
 #define WHEEL_PRIx PRIx32
 
 typedef uint32_t wheel_t;
+
+#define rotr(v,c) rotr32((v),(c))
+#define rotl(v,c) rotl32((v),(c))
 
 #elif WHEEL_BIT == 4
 
@@ -169,6 +175,9 @@ typedef uint32_t wheel_t;
 
 typedef uint16_t wheel_t;
 
+#define rotr(v,c) rotr16((v),(c))
+#define rotl(v,c) rotl16((v),(c))
+
 #elif WHEEL_BIT == 3
 
 #define WHEEL_C(n) UINT8_C(n)
@@ -177,25 +186,12 @@ typedef uint16_t wheel_t;
 
 typedef uint8_t wheel_t;
 
+#define rotr(v,c) rotr8((v),(c))
+#define rotl(v,c) rotl8((v),(c))
+
 #else
 #error invalid WHEEL_BIT value
 #endif
-
-
-static inline wheel_t rotl(const wheel_t v, int c) {
-	if (!(c &= (sizeof v * CHAR_BIT - 1)))
-		return v;
-
-	return (v << c) | (v >> (sizeof v * CHAR_BIT - c));
-} /* rotl() */
-
-
-static inline wheel_t rotr(const wheel_t v, int c) {
-	if (!(c &= (sizeof v * CHAR_BIT - 1)))
-		return v;
-
-	return (v >> c) | (v << (sizeof v * CHAR_BIT - c));
-} /* rotr() */
 
 
 /*
