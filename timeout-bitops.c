@@ -155,6 +155,35 @@ static inline int ctz32(uint32_t x)
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+/* We need to find a rotate idiom that accepts 0-sized rotates.  So we can't
+ * use the "normal" (v<<c) | (v >> (bits-c)), since if c==0, then v >>
+ * (bits-c) will be undefined.
+ *
+ * The definitions below will also work okay when c is greater than the
+ * bit width, though we don't actually require those.
+ */
+
+#if 1
+/* Many modern compilers recognize the idiom here as equivalent to rotr/rotl,
+ * and emit a single instruction.
+ */
+#define DECLARE_ROTATE_(bits, type)					\
+	static inline type rotl##bits(const type v, int c) {		\
+		const int mask = (bits)-1;				\
+		c &= mask;						\
+									\
+		return (v << c) | (v >> (-c & mask));			\
+	} /* rotl() */							\
+									\
+	static inline type rotr##bits(const type v, int c) {		\
+		const int mask = (bits)-1;				\
+		c &= mask;						\
+									\
+		return (v >> c) | (v << (-c & mask));			\
+	} /* rotr() */
+
+#else
+/* We aren't using this unless we find somewhere that it's faster. */
 
 #define DECLARE_ROTATE_(bits, type)					\
 	static inline type rotl##bits(const type v, int c)	{ 	\
@@ -170,7 +199,7 @@ static inline int ctz32(uint32_t x)
 									\
 		return (v >> c) | (v << ((bits) - c));			\
 	} /* rotr() */
-
+#endif
 #define DECLARE_ROTATE(bits)                    \
 	DECLARE_ROTATE_(bits, uint##bits##_t)
 
