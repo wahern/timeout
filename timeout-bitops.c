@@ -163,7 +163,21 @@ static inline int ctz32(uint32_t x)
  * bit width, though we don't actually require those.
  */
 
-#if 1
+#if defined(_MSC_VER) && !defined(TIMEOUT_DISABLE_MSVC_BITOPS)
+/* MSVC provides these declarations in stdlib.h and intrin.h */
+
+#define rotr8(v,c) _rotr8((v),(c)&7)
+#define rotl8(v,c) _rotl8((v),(c)&7)
+#define rotr16(v,c) _rotr16((v),(c)&15)
+#define rotl16(v,c) _rotl16((v),(c)&15)
+#define rotr32(v,c) _rotr32((v),(c)&31)
+#define rotl32(v,c) _rotl32((v),(c)&31)
+#define rotr64(v,c) _rotr64((v),(c)&63)
+#define rotl64(v,c) _rotl64((v),(c)&63)
+
+#define DECLARE_ROTATE_(bits, type)
+
+#elif 1
 /* Many modern compilers recognize the idiom here as equivalent to rotr/rotl,
  * and emit a single instruction.
  */
