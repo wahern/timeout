@@ -121,7 +121,7 @@ struct timeout {
 	struct timeout_list *pending;
 	/* timeout list if pending on wheel or expiry queue */
 
-	TAILQ_ENTRY(timeout) tqe;
+	LIST_ENTRY(timeout) le;
 	/* entry member for struct timeout_list lists */
 
 #ifndef TIMEOUT_DISABLE_CALLBACKS
