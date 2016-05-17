@@ -47,16 +47,19 @@ LUA_APIS = 5.1 5.2 5.3
 include $(top_srcdir)/lua/Rules.mk
 include $(top_srcdir)/bench/Rules.mk
 
-all: test-timeout
+all: test-timeout test-bitops
 
-timeout.o: $(top_srcdir)/timeout.c
-test-timeout.o: $(top_srcdir)/test-timeout.c
+timeout.o: $(top_srcdir)/timeout.c $(top_srcdir)/timeout-bitops.c $(top_srcdir)/timeout.h $(top_srcdir)/timeout-debug.h
+test-timeout.o: $(top_srcdir)/test-timeout.c $(top_srcdir)/timeout.h
 
 timeout.o test-timeout.o:
 	@$(SHRC); echo_cmd $(CC) $(ALL_CFLAGS) -c -o $@ $${top_srcdir}/$(@F:%.o=%.c) $(ALL_CPPFLAGS)
 
 test-timeout: timeout.o test-timeout.o
 	@$(SHRC); echo_cmd $(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ timeout.o test-timeout.o
+
+test-bitops: $(top_srcdir)/timeout-bitops.c
+	@$(SHRC); echo_cmd $(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -DTEST_BITOPS -o $@ timeout-bitops.c
 
 .PHONY: clean clean~
 

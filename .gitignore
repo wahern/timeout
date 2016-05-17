@@ -1,3 +1,5 @@
+\#*
+.#*
 *.o
 *.gcda
 *.gcov
@@ -5,3 +7,8 @@
 *~
 *.so
 *.dSYM
+test-timeout
+test-bitops
+bench/*.dat
+bench/*.eps
+bench/*.pdf
