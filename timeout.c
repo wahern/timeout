@@ -320,10 +320,10 @@ static inline int timeout_slot(int wheel, timeout_t expires) {
 	return WHEEL_MASK & ((expires >> (wheel * WHEEL_BIT)) - !!wheel);
 } /* timeout_slot() */
 
+static void timeouts_sched_nopending(struct timeouts *T, struct timeout *to);
+static void timeouts_sched_future_nopending(struct timeouts *T, struct timeout *to);
 
 static void timeouts_sched(struct timeouts *T, struct timeout *to, timeout_t expires) {
-	timeout_t rem;
-	int wheel, slot;
 
 	timeouts_del(T, to);
 
@@ -331,26 +331,42 @@ static void timeouts_sched(struct timeouts *T, struct timeout *to, timeout_t exp
 
 	TO_SET_TIMEOUTS(to, T);
 
-	if (expires > T->curtime) {
-		rem = timeout_rem(T, to);
+	timeouts_sched_nopending(T, to);
+} /* timeouts_sched() */
 
-		/* rem is nonzero since:
-		 *   rem == timeout_rem(T,to),
-		 *       == to->expires - T->curtime
-		 *   and above we have expires > T->curtime.
-		 */
-		wheel = timeout_wheel(rem);
-		slot = timeout_slot(wheel, to->expires);
-
-		to->pending = &T->wheel[wheel][slot];
-		TAILQ_INSERT_TAIL(to->pending, to, tqe);
-
-		T->pending[wheel] |= WHEEL_C(1) << slot;
-	} else {
+/* As 'timeouts_sched_future_nopending', but do not require that to->expires
+ * is in the future. */
+static void timeouts_sched_nopending(struct timeouts *T, struct timeout *to) {
+        if (to->expires > T->curtime) {
+		timeouts_sched_future_nopending(T, to);
+        } else {
 		to->pending = &T->expired;
 		TAILQ_INSERT_TAIL(to->pending, to, tqe);
-	}
-} /* timeouts_sched() */
+        }
+} /* timeouts_sched_nopending() */
+
+/* Insert 'to' into 'T'.  Requres that to->expires is set, and set some time
+* in the future. Requires that to is not pending or expired. Requires that
+* TO_SET_TIMEOUTS has been set. */
+static void timeouts_sched_future_nopending(struct timeouts *T, struct timeout *to) {
+	timeout_t rem;
+	int wheel, slot;
+
+	rem = timeout_rem(T, to);
+
+	/* rem is nonzero since:
+	 *   rem == timeout_rem(T,to),
+	 *       == to->expires - T->curtime
+	 *   and above we have expires > T->curtime.
+	 */
+	wheel = timeout_wheel(rem);
+	slot = timeout_slot(wheel, to->expires);
+
+	to->pending = &T->wheel[wheel][slot];
+	TAILQ_INSERT_TAIL(to->pending, to, tqe);
+
+	T->pending[wheel] |= WHEEL_C(1) << slot;
+} /* timeouts_sched_future_nopending() */
 
 
 #ifndef TIMEOUT_DISABLE_INTERVALS
@@ -367,7 +383,7 @@ static void timeouts_readd(struct timeouts *T, struct timeout *to) {
 		to->expires = T->curtime + (to->interval - r);
 	}
 
-	timeouts_sched(T, to, to->expires);
+	timeouts_sched_future_nopending(T, to);
 } /* timeouts_readd() */
 #endif
 
@@ -454,7 +470,7 @@ TIMEOUT_PUBLIC void timeouts_update(struct timeouts *T, abstime_t curtime) {
 		TAILQ_REMOVE(&todo, to, tqe);
 		to->pending = NULL;
 
-		timeouts_sched(T, to, to->expires);
+		timeouts_sched_nopending(T, to);
 	}
 
 	return;
