@@ -3,6 +3,12 @@
 #include <intrin.h>     /* _BitScanForward, _BitScanReverse */
 #endif
 
+/*
+ * L E A D I N G   A N D   T R A I L I N G   Z E R O S
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
 /* First define ctz and clz functions; these are compiler-dependent if
  * you want them to be fast. */
 #if defined(__GNUC__) && !defined(TIMEOUT_DISABLE_GNUC_BITOPS)
@@ -141,7 +147,80 @@ static inline int ctz32(uint32_t x)
 
 /* End of generic case */
 
-#endif /* End of defining ctz */
+#endif /* End of defining ctz and clz. */
+
+
+/*
+ * B I T W I S E   R O T A T I O N
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/* We need to find a rotate idiom that accepts 0-sized rotates.  So we can't
+ * use the "normal" (v<<c) | (v >> (bits-c)), since if c==0, then v >>
+ * (bits-c) will be undefined.
+ *
+ * The definitions below will also work okay when c is greater than the
+ * bit width, though we don't actually require those.
+ */
+
+#if defined(_MSC_VER) && !defined(TIMEOUT_DISABLE_MSVC_BITOPS)
+/* MSVC provides these declarations in stdlib.h and intrin.h */
+
+#define rotr8(v,c) _rotr8((v),(c)&7)
+#define rotl8(v,c) _rotl8((v),(c)&7)
+#define rotr16(v,c) _rotr16((v),(c)&15)
+#define rotl16(v,c) _rotl16((v),(c)&15)
+#define rotr32(v,c) _rotr32((v),(c)&31)
+#define rotl32(v,c) _rotl32((v),(c)&31)
+#define rotr64(v,c) _rotr64((v),(c)&63)
+#define rotl64(v,c) _rotl64((v),(c)&63)
+
+#define DECLARE_ROTATE_(bits, type)
+
+#elif 1
+/* Many modern compilers recognize the idiom here as equivalent to rotr/rotl,
+ * and emit a single instruction.
+ */
+#define DECLARE_ROTATE_(bits, type)					\
+	static inline type rotl##bits(const type v, int c) {		\
+		const int mask = (bits)-1;				\
+		c &= mask;						\
+									\
+		return (v << c) | (v >> (-c & mask));			\
+	} /* rotl() */							\
+									\
+	static inline type rotr##bits(const type v, int c) {		\
+		const int mask = (bits)-1;				\
+		c &= mask;						\
+									\
+		return (v >> c) | (v << (-c & mask));			\
+	} /* rotr() */
+
+#else
+/* We aren't using this unless we find somewhere that it's faster. */
+
+#define DECLARE_ROTATE_(bits, type)					\
+	static inline type rotl##bits(const type v, int c)	{ 	\
+		if (!(c &= ((bits)-1)))					\
+			return v;					\
+									\
+		return (v << c) | (v >> ((bits) - c));			\
+	} /* rotl() */							\
+									\
+	static inline type rotr##bits(const type v, int c) {		\
+		if (!(c &= ((bits)-1)))					\
+			return v;					\
+									\
+		return (v >> c) | (v << ((bits) - c));			\
+	} /* rotr() */
+#endif
+#define DECLARE_ROTATE(bits)                    \
+	DECLARE_ROTATE_(bits, uint##bits##_t)
+
+DECLARE_ROTATE(64);
+DECLARE_ROTATE(32);
+DECLARE_ROTATE(16);
+DECLARE_ROTATE(8);
 
 #ifdef TEST_BITOPS
 #include <stdio.h>
@@ -183,10 +262,64 @@ naive_ctz(int bits, uint64_t v)
 	return r;
 }
 
+static uint64_t naive_rotl(int n_bits, uint64_t v, int c)
+{
+	uint64_t r = 0;
+	int i;
+	for (i = 0; i < n_bits; ++i) {
+		if (v & ((uint64_t)1)<<i) {
+			r |= ((uint64_t)1) << ((i+c)%n_bits);
+		}
+	}
+	return r;
+}
+static uint64_t naive_rotr(int n_bits, uint64_t v, int c)
+{
+	c %= n_bits;
+	return naive_rotl(n_bits, v, n_bits-c);
+}
+
+
 static int
 check(uint64_t vv)
 {
 	uint32_t v32 = (uint32_t) vv;
+	int j;
+
+	for (j = 0; j < 64; ++j) {
+		if (rotr64(vv, j) != naive_rotr(64, vv, j)) {
+			printf("mismatch with rotr64");
+			exit(1);
+		}
+		if (rotl64(vv, j) != naive_rotl(64, vv, j)) {
+			printf("mismatch with rotl64");
+			exit(1);
+		}
+		if (rotr32(vv, j) != naive_rotr(32, vv, j)) {
+			printf("mismatch with rotr32");
+			exit(1);
+		}
+		if (rotl32(vv, j) != naive_rotl(32, vv, j)) {
+			printf("mismatch with rotl32");
+			exit(1);
+		}
+		if (rotr16(vv, j) != naive_rotr(16, vv, j)) {
+			printf("mismatch with rotr16");
+			exit(1);
+		}
+		if (rotl16(vv, j) != naive_rotl(16, vv, j)) {
+			printf("mismatch with rotl16");
+			exit(1);
+		}
+		if (rotr8(vv, j) != naive_rotr(8, vv, j)) {
+			printf("mismatch with rotr8");
+			exit(1);
+		}
+		if (rotl8(vv, j) != naive_rotl(8, vv, j)) {
+			printf("mismatch with rotl8");
+			exit(1);
+		}
+	}
 
 	if (vv == 0)
 		return 1; /* c[tl]z64(0) is undefined. */
