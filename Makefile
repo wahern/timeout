@@ -47,7 +47,20 @@ LUA_APIS = 5.1 5.2 5.3
 include $(top_srcdir)/lua/Rules.mk
 include $(top_srcdir)/bench/Rules.mk
 
-all: test-timeout
+all: check-timeout-cb test-timeout
+
+check-timeout-cb:
+	@echo $(CFLAGS) $(CPPFLAGS) | grep "\-DTIMEOUT_CB_OVERRIDE" > /dev/null  \
+	&& NEED_OVERRIDE=1 || NEED_OVERRIDE=0;\
+	if [[ "$${NEED_OVERRIDE}" -eq "1" ]];then \
+	TEMPOUT=`mktemp /tmp/timeout-out.XXXXXX`; \
+	TEMPCHK=`mktemp /tmp/timeout-chk.XXXXXX`; \
+	printf "#include \"timeout_cb.h\"\nint main(){struct timeout_cb cb;return 0;}" > $${TEMPCHK}.c; \
+	$(CC) -o $${TEMPOUT} $${TEMPCHK}.c $(ALL_CPPFLAGS) 2> /dev/null && HAS_TIMEOUT_CB=1 || HAS_TIMEOUT_CB=0; \
+	$(RM) /tmp/timeout-out.* /tmp/timeout-chk.*; \
+	if [[ "$${HAS_TIMEOUT_CB}" -eq "0" ]];then echo "Error: Can not find 'timeout_cb.h' or have not defined \
+	struct timeout_cb. If you have defined the macro TIMEOUT_CB_OVERRIDE, please create 'timeout_cb.h' and \
+	define your own struct timeout_cb in it." && exit 1; fi fi
 
 timeout.o: $(top_srcdir)/timeout.c
 test-timeout.o: $(top_srcdir)/test-timeout.c
