@@ -622,6 +622,20 @@ TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *T, FILE *fp) {
 	return 1;
 } /* timeouts_check() */
 
+#ifdef DEBUG
+TIMEOUT_PUBLIC int timeouts_pendings(struct timeouts *T, uint64_t **pendings) {
+    int i;
+    if (pendings) {
+        *pendings = (uint64_t *)malloc(sizeof(uint64_t) * WHEEL_NUM);
+        for (i = 0; i < WHEEL_NUM; i++) {
+            (*pendings)[i] = T->pending[i];
+        }
+        return WHEEL_NUM;
+    }
+    return 0;
+} /* timeouts_pendings() */
+#endif
+
 
 #define ENTER                                                           \
 	do {                                                            \

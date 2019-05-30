@@ -198,6 +198,12 @@ TIMEOUT_PUBLIC bool timeouts_expired(struct timeouts *);
 TIMEOUT_PUBLIC bool timeouts_check(struct timeouts *, FILE *);
 /* return true if invariants hold. describes failures to optional file handle. */
 
+#ifdef DEBUG
+TIMEOUT_PUBLIC int timeouts_pendings(struct timeouts *, uint64_t **);
+/* return timing wheel number. copy pendings of all wheels to malloced memory
+ * (which need free by yourself). */
+#endif
+
 #define TIMEOUTS_PENDING 0x10
 #define TIMEOUTS_EXPIRED 0x20
 #define TIMEOUTS_ALL     (TIMEOUTS_PENDING|TIMEOUTS_EXPIRED)
